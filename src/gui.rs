@@ -368,13 +368,6 @@ fn show_cockpit_from_tray(ui_weak: &slint::Weak<MainWindow>) {
                     format!("开销: {:.1} MB", proc.memory() as f64 / (1024.0 * 1024.0)).into(),
                 );
             }
-
-            static TICK_COUNT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
-            let ticks = TICK_COUNT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-            if ticks == 2 || (ticks > 0 && ticks.is_multiple_of(30)) {
-                #[cfg(target_os = "windows")]
-                trim_working_set();
-            }
         }
     });
 
