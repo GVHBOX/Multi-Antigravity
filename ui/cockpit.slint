@@ -147,13 +147,13 @@ export component MainWindow inherits Window {
     // 数据绑定属性
     in property <string> app_title: "Antigravity 开发者座舱";
     in property <string> app_subtitle: "多实例调度与环境隔离系统";
-    in property <string> kernel_status: "Slint 原生硬件加速就绪";
-    in property <string> ram_overhead: "开销: 12.4 MB";
-    in property <string> current_time: "23:15:00";
+    in property <string> kernel_status: "Slint 原生矢量渲染就绪";
+    in property <string> ram_overhead: "开销: --";
+    in property <string> current_time: "--:--:--";
 
     // 实例遥测
-    in property <string> host_pid: "14820";
-    in property <string> host_port: "52103";
+    in property <bool> host_running: false;
+    in property <string> host_port: "--";
     in property <float> host_cpu: 0.8;
     in property <float> host_ram: 342.6;
 
@@ -164,9 +164,9 @@ export component MainWindow inherits Window {
     in property <float> sub_ram: 0.0;
 
     in property <string> total_ram: "342.6 MB";
-    in property <string> toast_message: "极客原生架构：采用 Slint 硬件加速引擎自绘，零 Chromium 浏览器进程，内存占用骤降 85%。";
+    in property <string> toast_message: "极客原生架构：采用 Slint 原生矢量引擎自绘，零 Chromium 浏览器进程。";
 
-    in property <string> log_content: "[READY] Slint 原生 GUI 内核初始化完毕。\n[HOST] 主机实例正在运行 (Port: 52103)。\n[INFO] 按键已全局绑定：Space 启动分身，K 停止，C 换号。";
+    in property <string> log_content: "[READY] Slint 原生 GUI 内核初始化完毕。\n[INFO] 按键已全局绑定：Space 启动分身，K 停止，C 换号。";
 
     // 回调事件
     callback action_space();
@@ -311,10 +311,10 @@ export component MainWindow inherits Window {
 
             KpiCard {
                 title: "主机实例状态";
-                sub_left: "常驻在线";
-                value: "在线常驻";
+                sub_left: root.host_running ? "常驻在线" : "未检测到";
+                value: root.host_running ? "在线常驻" : "未运行";
                 sub_right: "本地服务 Port: " + root.host_port;
-                val_color: #34d399;
+                val_color: root.host_running ? #34d399 : #64748b;
             }
 
             KpiCard {
@@ -619,7 +619,8 @@ export component MainWindow inherits Window {
                         vertical-stretch: 1;
 
                         ScrollView {
-                            Text {
+                            content-y: -log_text.height;
+                            log_text := Text {
                                 text: root.log_content;
                                 color: #cbd5e1;
                                 font-size: 11px;
@@ -702,7 +703,7 @@ export component MainWindow inherits Window {
                         Text { text: root.toast_message; color: #94a3b8; font-size: 11px; vertical-alignment: center; }
                     }
 
-                    Text { text: "纯原生 GPU 矢量渲染"; color: #64748b; font-size: 10px; vertical-alignment: center; }
+                    Text { text: "纯原生矢量渲染"; color: #64748b; font-size: 10px; vertical-alignment: center; }
                 }
             }
         }

@@ -2,6 +2,9 @@ use crate::launcher::LauncherConfig;
 use crate::monitor::TelemetryMonitor;
 use anyhow::Result;
 use slint::{CloseRequestResponse, ComponentHandle, Timer, TimerMode};
+use std::cell::RefCell;
+use std::collections::VecDeque;
+use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
 slint::include_modules!();
@@ -168,11 +171,19 @@ fn show_cockpit_from_tray(ui_weak: &slint::Weak<MainWindow>) {
     });
 
     // 4. 绑定 UI 回调与按键动作
-    let append_log = |ui: &MainWindow, tag: &str, msg: &str| {
-        let old = ui.get_log_content();
-        let time = chrono::Local::now().format("%H:%M:%S").to_string();
-        let new_line = format!("[{}] [{}] {}\n", time, tag, msg);
-        ui.set_log_content(format!("{}{}", old, new_line).into());
+    let log_buffer: Rc<RefCell<VecDeque<String>>> =
+        Rc::new(RefCell::new(VecDeque::with_capacity(250)));
+    let append_log = {
+        let log_buffer = Rc::clone(&log_buffer);
+        move |ui: &MainWindow, tag: &str, msg: &str| {
+            let time = chrono::Local::now().format("%H:%M:%S").to_string();
+            let mut buffer = log_buffer.borrow_mut();
+            if buffer.len() >= 250 {
+                buffer.pop_front();
+            }
+            buffer.push_back(format!("[{}] [{}] {}\n", time, tag, msg));
+            ui.set_log_content(buffer.iter().cloned().collect::<String>().into());
+        }
     };
 
     // Space
@@ -180,6 +191,7 @@ fn show_cockpit_from_tray(ui_weak: &slint::Weak<MainWindow>) {
         let ui_weak = main_window.as_weak();
         let conf = Arc::clone(&config);
         let pid_lock = Arc::clone(&sub_pid);
+        let append_log = append_log.clone();
         move || {
             if let Some(ui) = ui_weak.upgrade() {
                 let c = conf.lock().unwrap();
@@ -212,6 +224,7 @@ fn show_cockpit_from_tray(ui_weak: &slint::Weak<MainWindow>) {
         let ui_weak = main_window.as_weak();
         let conf = Arc::clone(&config);
         let pid_lock = Arc::clone(&sub_pid);
+        let append_log = append_log.clone();
         move || {
             if let Some(ui) = ui_weak.upgrade() {
                 let c = conf.lock().unwrap();
@@ -234,10 +247,24 @@ fn show_cockpit_from_tray(ui_weak: &slint::Weak<MainWindow>) {
     // R
     main_window.on_action_restart({
         let ui_weak = main_window.as_weak();
+        let conf = Arc::clone(&config);
+        let monitor_restart = Arc::clone(&monitor);
+        let append_log = append_log.clone();
         move || {
-            if let Some(ui) = ui_weak.upgrade() {
-                ui.set_toast_message("已重置刷新实例遥测探测器。".into());
-                append_log(&ui, "RESTART", "已重置刷新实例遥测探测器");
+            let Some(ui) = ui_weak.upgrade() else {
+                return;
+            };
+            let ls_pid = monitor_restart.lock().unwrap().sub.ls_pid;
+            let c = conf.lock().unwrap();
+            if let Some(pid) = ls_pid {
+                let _ = c.kill_sub_instance_by_pid(pid);
+                ui.set_toast_message(
+                    format!("已回收分身语言服务 (PID: {})，Electron 会自动重新拉起。", pid).into(),
+                );
+                append_log(&ui, "LANG_SVR", &format!("回收分身语言服务 (PID: {})", pid));
+            } else {
+                ui.set_toast_message("分身语言服务未在运行，无需回收。".into());
+                append_log(&ui, "LANG_SVR", "分身语言服务未在运行，无需回收");
             }
         }
     });
@@ -246,6 +273,7 @@ fn show_cockpit_from_tray(ui_weak: &slint::Weak<MainWindow>) {
     main_window.on_action_clear({
         let ui_weak = main_window.as_weak();
         let conf = Arc::clone(&config);
+        let append_log = append_log.clone();
         move || {
             if let Some(ui) = ui_weak.upgrade() {
                 let c = conf.lock().unwrap();
@@ -269,6 +297,7 @@ fn show_cockpit_from_tray(ui_weak: &slint::Weak<MainWindow>) {
     main_window.on_action_open({
         let ui_weak = main_window.as_weak();
         let conf = Arc::clone(&config);
+        let append_log = append_log.clone();
         move || {
             if let Some(ui) = ui_weak.upgrade() {
                 let c = conf.lock().unwrap();
@@ -292,17 +321,25 @@ fn show_cockpit_from_tray(ui_weak: &slint::Weak<MainWindow>) {
     let monitor_timer = Arc::clone(&monitor);
     let sub_pid_mon = Arc::clone(&sub_pid);
 
+    let mut self_sys = sysinfo::System::new();
+
     timer.start(TimerMode::Repeated, std::time::Duration::from_millis(1000), move || {
         if let Some(ui) = ui_weak_mon.upgrade() {
             let mut mon = monitor_timer.lock().unwrap();
             let known_sub = *sub_pid_mon.lock().unwrap();
             mon.refresh(known_sub);
+            if !mon.sub.is_running {
+                *sub_pid_mon.lock().unwrap() = None;
+            }
 
             // 更新 Host 指标
+            ui.set_host_running(mon.host.is_running);
             ui.set_host_cpu(mon.host.cpu_usage);
             ui.set_host_ram(mon.host.memory_rss_mb as f32);
             if let Some(port) = mon.host.ls_port {
                 ui.set_host_port(port.to_string().into());
+            } else {
+                ui.set_host_port("--".into());
             }
 
             // 更新 Sub 指标
@@ -323,6 +360,14 @@ fn show_cockpit_from_tray(ui_weak: &slint::Weak<MainWindow>) {
             // 更新聚合总内存与时钟
             ui.set_total_ram(format!("{:.1} MB", mon.total_memory_mb).into());
             ui.set_current_time(chrono::Local::now().format("%H:%M:%S").to_string().into());
+
+            let self_pid = sysinfo::Pid::from_u32(std::process::id());
+            self_sys.refresh_processes(sysinfo::ProcessesToUpdate::Some(&[self_pid]), true);
+            if let Some(proc) = self_sys.process(self_pid) {
+                ui.set_ram_overhead(
+                    format!("开销: {:.1} MB", proc.memory() as f64 / (1024.0 * 1024.0)).into(),
+                );
+            }
 
             static TICK_COUNT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
             let ticks = TICK_COUNT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);

@@ -28,17 +28,11 @@ impl LauncherConfig {
         let token_path = home_dir.join(".gemini").join("jetski-standalone-oauth-token");
 
         // Locate Antigravity.exe
-        let local_app_data = env::var("LOCALAPPDATA").unwrap_or_else(|_| r"C:\Users\GVH\AppData\Local".to_string());
-        let default_exe = PathBuf::from(local_app_data)
+        let local_app_data = env::var("LOCALAPPDATA").context("LOCALAPPDATA is not set")?;
+        let executable_path = PathBuf::from(local_app_data)
             .join("Programs")
             .join("antigravity")
             .join("Antigravity.exe");
-
-        let executable_path = if default_exe.exists() {
-            default_exe
-        } else {
-            PathBuf::from(r"C:\Users\GVH\AppData\Local\Programs\antigravity\Antigravity.exe")
-        };
 
         Ok(Self {
             executable_path,

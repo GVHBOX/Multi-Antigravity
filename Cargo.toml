@@ -12,7 +12,11 @@ ratatui = "0.30.2"
 slint = "1.18.1"
 sysinfo = "0.39.6"
 tray-icon = "0.26.0"
-windows-sys = { version = "0.61.2", features = ["Win32_UI_WindowsAndMessaging", "Win32_Foundation", "Win32_System_Threading", "Win32_System_Console", "Win32_Graphics_Gdi"] }
+windows-sys = { version = "0.61.2", features = ["Win32_UI_WindowsAndMessaging", "Win32_Foundation", "Win32_System_Threading", "Win32_System_Console"] }
+
+[profile.release]
+strip = true
+lto = "thin"
 
 [build-dependencies]
 slint-build = "1.18.1"

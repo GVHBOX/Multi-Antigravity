@@ -20,6 +20,7 @@ pub struct App {
     pub sub_known_pid: Option<u32>,
     pub launcher_rss_mb: f64,
     pub should_quit: bool,
+    sys: sysinfo::System,
 }
 
 impl App {
@@ -36,6 +37,7 @@ impl App {
             sub_known_pid: None,
             launcher_rss_mb: 5.2,
             should_quit: false,
+            sys: sysinfo::System::new(),
         };
 
         app.init_logs();
@@ -95,9 +97,8 @@ impl App {
 
         // Measure launcher's own memory (using current PID)
         let current_pid = std::process::id();
-        let mut sys = sysinfo::System::new();
-        sys.refresh_processes(sysinfo::ProcessesToUpdate::Some(&[sysinfo::Pid::from_u32(current_pid)]), true);
-        if let Some(proc) = sys.process(sysinfo::Pid::from_u32(current_pid)) {
+        self.sys.refresh_processes(sysinfo::ProcessesToUpdate::Some(&[sysinfo::Pid::from_u32(current_pid)]), true);
+        if let Some(proc) = self.sys.process(sysinfo::Pid::from_u32(current_pid)) {
             self.launcher_rss_mb = (proc.memory() as f64) / (1024.0 * 1024.0);
         }
     }
@@ -138,7 +139,7 @@ impl App {
                 }
                 Err(err) => {
                     let err_msg = format!("启动失败: {}", err);
-                    self.add_log("KILL", &err_msg);
+                    self.add_log("SPAWN", &err_msg);
                     self.set_toast(err_msg, true);
                 }
             }
@@ -241,7 +242,7 @@ impl App {
     }
 
     fn init_logs(&mut self) {
-        self.add_log("SYSTEM", "Antigravity Studio 调度座舱初始化完成 (Rust 1.98.1 x86_64-windows-msvc)。");
+        self.add_log("SYSTEM", "Antigravity Studio 调度座舱初始化完成。");
         self.add_log("KERNEL", "Win32 作业对象控制模块就绪，已配置 CREATE_BREAKAWAY_FROM_JOB 标志位。");
         self.add_log("SANDBOX", "独立数据沙箱校验通过: data/instance_2 (USERPROFILE / APPDATA 物理隔离)。");
         self.add_log("HOOK", "凭据库旁路生效: SSH_CONNECTION=127.0.0.1 (强制使用 FileTokenStorage 杜绝冲突)。");

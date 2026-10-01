@@ -4,7 +4,6 @@ pub enum Language {
     En,
 }
 
-#[allow(dead_code)]
 pub struct Strings {
     pub app_title: &'static str,
     pub app_subtitle: &'static str,
@@ -14,7 +13,6 @@ pub struct Strings {
     pub tile_host_title: &'static str,
     pub tile_sub_title: &'static str,
     pub tile_mem_title: &'static str,
-    pub tile_mem_sub: &'static str,
     pub tile_iso_title: &'static str,
     pub tile_iso_level: &'static str,
     pub tile_iso_safe: &'static str,
@@ -41,10 +39,8 @@ pub struct Strings {
     pub sandbox_root_label: &'static str,
     pub tag_isolated: &'static str,
     pub tag_pass_through: &'static str,
-    pub lbl_bypass_hook: &'static str,
     pub tag_hook_active: &'static str,
     pub log_title: &'static str,
-    pub log_realtime: &'static str,
     pub btn_space: &'static str,
     pub btn_kill: &'static str,
     pub btn_restart: &'static str,
@@ -53,7 +49,6 @@ pub struct Strings {
     pub btn_lang: &'static str,
     pub btn_quit: &'static str,
     pub toast_notice: &'static str,
-    pub dock_status: &'static str,
 }
 
 pub const ZH_STRINGS: Strings = Strings {
@@ -65,7 +60,6 @@ pub const ZH_STRINGS: Strings = Strings {
     tile_host_title: "主实例状态",
     tile_sub_title: "分身脱机运行",
     tile_mem_title: "双实例总内存",
-    tile_mem_sub: "物理占用 (RSS)",
     tile_iso_title: "隔离安全级别",
     tile_iso_level: "物理级完全沙箱",
     tile_iso_safe: "无串号风险",
@@ -92,10 +86,8 @@ pub const ZH_STRINGS: Strings = Strings {
     sandbox_root_label: "沙箱根目录",
     tag_isolated: "已隔离",
     tag_pass_through: "原生继承 (Chrome)",
-    lbl_bypass_hook: "凭据重定向钩子",
     tag_hook_active: "强制独立凭证",
     log_title: "引擎诊断控制台",
-    log_realtime: "实时监测接入中",
     btn_space: "启动 / 唤醒分身",
     btn_kill: "停止分身",
     btn_restart: "重启服务引擎",
@@ -104,7 +96,6 @@ pub const ZH_STRINGS: Strings = Strings {
     btn_lang: "中 / EN 切换",
     btn_quit: "安全脱离座舱",
     toast_notice: "进程脱离保障：分身通过 Win32 DETACHED 独立生成，退出控制座舱不会导致分身退出。",
-    dock_status: "按键已全局监听",
 };
 
 pub const EN_STRINGS: Strings = Strings {
@@ -116,7 +107,6 @@ pub const EN_STRINGS: Strings = Strings {
     tile_host_title: "Host Instance",
     tile_sub_title: "Detached Sub-Instance",
     tile_mem_title: "Combined Memory",
-    tile_mem_sub: "Physical (RSS)",
     tile_iso_title: "Isolation Level",
     tile_iso_level: "Physical Sandbox",
     tile_iso_safe: "Zero Conflict",
@@ -143,10 +133,8 @@ pub const EN_STRINGS: Strings = Strings {
     sandbox_root_label: "Sandbox Root",
     tag_isolated: "ISOLATED",
     tag_pass_through: "PASS-THROUGH (Chrome)",
-    lbl_bypass_hook: "Credential Redirect Hook",
     tag_hook_active: "ENFORCED",
     log_title: "Engine Diagnostics Console",
-    log_realtime: "Live telemetry connected",
     btn_space: "Launch / Bring to Front",
     btn_kill: "Stop Sub-Instance",
     btn_restart: "Restart Engine",
@@ -155,7 +143,6 @@ pub const EN_STRINGS: Strings = Strings {
     btn_lang: "Language [T]",
     btn_quit: "Detach Cockpit",
     toast_notice: "Detached guarantee: Sub-instance spawned via Win32 DETACHED. Exiting dashboard will not terminate it.",
-    dock_status: "Key listener active",
 };
 
 impl Language {
