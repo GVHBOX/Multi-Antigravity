@@ -2,5 +2,6 @@
 /data
 *.pdb
 *.png
+!assets/icon.png
 *.WebView2/
 *.exe
