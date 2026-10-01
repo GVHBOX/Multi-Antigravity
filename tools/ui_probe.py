@@ -73,7 +73,7 @@ def find_window(pid, min_width=200):
     return found[0] if found else None
 
 
-def grab(hwnd, rect, scale):
+def grab(hwnd, rect, scale, crop=None):
     x, y = rect.left, rect.top
     w, h = rect.right - x, rect.bottom - y
     screen = user32.GetDC(0)
@@ -95,14 +95,20 @@ def grab(hwnd, rect, scale):
     gdi32.GetDIBits(mem, bitmap, 0, h, buf, ctypes.byref(info), DIB_RGB_COLORS)
 
     out_w, out_h = w // scale, h // scale
+    cx, cy, cw, ch = crop if crop else (0, 0, out_w, out_h)
+    cx = max(0, min(cx, out_w - 1))
+    cy = max(0, min(cy, out_h - 1))
+    cw = max(1, min(cw, out_w - cx))
+    ch = max(1, min(ch, out_h - cy))
     rows = bytearray()
-    for oy in range(out_h):
+    for oy in range(cy, cy + ch):
         rows.append(0)
         base = oy * scale * w * 4
-        for ox in range(out_w):
+        for ox in range(cx, cx + cw):
             sx = ox * scale
             b, g, r, _a = buf[base + sx * 4: base + sx * 4 + 4]
             rows += bytes((r, g, b))
+    out_w, out_h = cw, ch
 
     gdi32.DeleteObject(bitmap)
     gdi32.DeleteDC(mem)
@@ -148,13 +154,13 @@ def cmd_rect(pid):
     return 0
 
 
-def cmd_shot(pid, scale=2, name="ui-shot.png"):
+def cmd_shot(pid, scale=2, name="ui-shot.png", crop=None):
     got = find_window(pid)
     if not got:
         print("window not found")
         return 1
     hwnd, rect = got
-    ow, oh, pixels, w, h = grab(hwnd, rect, scale)
+    ow, oh, pixels, w, h = grab(hwnd, rect, scale, crop)
     path = SHOT_DIR / name
     size = write_png(path, ow, oh, pixels)
     print("window %dx%d -> %dx%d, %d KB, %s" % (w, h, ow, oh, size // 1024, path))
@@ -191,8 +197,11 @@ def main(argv):
     if cmd == "rect" and len(argv) >= 2:
         return cmd_rect(int(argv[1]))
     if cmd == "shot" and len(argv) >= 2:
+        crop = None
+        if len(argv) > 4:
+            crop = tuple(int(v) for v in argv[4].split(","))
         return cmd_shot(int(argv[1]), int(argv[2]) if len(argv) > 2 else 2,
-                        argv[3] if len(argv) > 3 else "ui-shot.png")
+                        argv[3] if len(argv) > 3 else "ui-shot.png", crop)
     if cmd == "key" and len(argv) >= 3:
         return cmd_key(int(argv[1]), int(argv[2], 16), int(argv[3]) if len(argv) > 3 else 1)
     if cmd == "kill" and len(argv) >= 2:

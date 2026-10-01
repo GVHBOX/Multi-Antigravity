@@ -348,7 +348,7 @@ export component MainWindow inherits Window {
 
         HorizontalLayout {
             spacing: 16px;
-            height: 260px;
+            min-height: 200px;
 
             Rectangle {
                 background: #0e121b;
@@ -360,6 +360,7 @@ export component MainWindow inherits Window {
                 VerticalLayout {
                     padding: 18px;
                     spacing: 14px;
+                    alignment: start;
 
                     HorizontalLayout {
                         alignment: space-between;
@@ -373,6 +374,7 @@ export component MainWindow inherits Window {
 
                     VerticalLayout {
                         spacing: 6px;
+                        alignment: start;
 
                         HorizontalLayout {
                             Text { text: "语言服务端口:"; color: #94a3b8; font-size: 13px; width: 118px; }
@@ -432,6 +434,7 @@ export component MainWindow inherits Window {
                 VerticalLayout {
                     padding: 18px;
                     spacing: 14px;
+                    alignment: start;
 
                     HorizontalLayout {
                         alignment: space-between;
@@ -456,6 +459,7 @@ export component MainWindow inherits Window {
 
                     VerticalLayout {
                         spacing: 6px;
+                        alignment: start;
 
                         HorizontalLayout {
                             Text { text: "语言服务端口:"; color: #94a3b8; font-size: 13px; width: 118px; }
