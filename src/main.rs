@@ -34,7 +34,12 @@ fn main() -> Result<()> {
     let use_tui = args.iter().any(|a| a == "--tui" || a == "-t");
 
     if !use_tui {
-        // Run Native Desktop GUI (Option B) - Exactly ONE sleek desktop window!
+        // Default to ultra-lightweight software renderer to bypass heavy NVIDIA GPU driver overhead (nvgpucomp64 100MB+)
+        if env::var("SLINT_BACKEND").is_err() {
+            unsafe {
+                env::set_var("SLINT_BACKEND", "winit-software");
+            }
+        }
         return gui::run_gui();
     }
 

@@ -27,17 +27,25 @@ pub struct TelemetryMonitor {
     pub host: ProcessStats,
     pub sub: ProcessStats,
     pub total_memory_mb: f64,
+    cached_host_ls_pid: Option<u32>,
+    cached_host_port: Option<u16>,
+    cached_sub_ls_pid: Option<u32>,
+    cached_sub_port: Option<u16>,
 }
 
 impl TelemetryMonitor {
     pub fn new() -> Self {
-        let mut sys = System::new_all();
+        let mut sys = System::new();
         sys.refresh_processes(ProcessesToUpdate::All, true);
         Self {
             sys,
             host: ProcessStats::default(),
             sub: ProcessStats::default(),
             total_memory_mb: 0.0,
+            cached_host_ls_pid: None,
+            cached_host_port: None,
+            cached_sub_ls_pid: None,
+            cached_sub_port: None,
         }
     }
 
@@ -57,19 +65,19 @@ impl TelemetryMonitor {
         for (pid, proc) in self.sys.processes() {
             let pid_u32 = pid.as_u32();
             let name = proc.name().to_string_lossy().to_lowercase();
-            let cmd_line = proc
-                .cmd()
-                .iter()
-                .map(|s| s.to_string_lossy())
-                .collect::<Vec<_>>()
-                .join(" ");
-
             let is_antigravity = name.contains("antigravity");
             let is_ls = name.contains("language_server") || name.contains("jetski");
 
             if !is_antigravity && !is_ls {
                 continue;
             }
+
+            let cmd_line = proc
+                .cmd()
+                .iter()
+                .map(|s| s.to_string_lossy())
+                .collect::<Vec<_>>()
+                .join(" ");
 
             // Determine whether this process belongs to sub-instance or host
             let is_sub = cmd_line.contains("instance_2")
@@ -103,13 +111,25 @@ impl TelemetryMonitor {
             }
         }
 
+        // Update host port cache
+        if host_ls_pid != self.cached_host_ls_pid || self.cached_host_port.is_none() {
+            self.cached_host_ls_pid = host_ls_pid;
+            self.cached_host_port = host_ls_pid.and_then(detect_listening_port);
+        }
+
+        // Update sub port cache
+        if sub_ls_pid != self.cached_sub_ls_pid || self.cached_sub_port.is_none() {
+            self.cached_sub_ls_pid = sub_ls_pid;
+            self.cached_sub_port = sub_ls_pid.and_then(detect_listening_port);
+        }
+
         self.host = ProcessStats {
             is_running: host_electron_pid.is_some(),
             electron_pid: host_electron_pid,
             ls_pid: host_ls_pid,
             cpu_usage: host_cpu,
             memory_rss_mb: (host_mem_bytes as f64) / (1024.0 * 1024.0),
-            ls_port: host_ls_pid.and_then(detect_listening_port),
+            ls_port: self.cached_host_port,
         };
 
         let sub_active = sub_electron_pid.is_some() || known_sub_pid.is_some();
@@ -119,7 +139,7 @@ impl TelemetryMonitor {
             ls_pid: sub_ls_pid,
             cpu_usage: sub_cpu,
             memory_rss_mb: (sub_mem_bytes as f64) / (1024.0 * 1024.0),
-            ls_port: sub_ls_pid.and_then(detect_listening_port),
+            ls_port: self.cached_sub_port,
         };
 
         self.total_memory_mb = self.host.memory_rss_mb + self.sub.memory_rss_mb;

@@ -91,12 +91,25 @@ pub fn run_gui() -> Result<()> {
         }
     }));
 
-    // 3. 点击右上角 [X] 缩小至系统托盘，不退出应用
+#[cfg(target_os = "windows")]
+fn trim_working_set() {
+    unsafe {
+        windows_sys::Win32::System::Threading::SetProcessWorkingSetSize(
+            windows_sys::Win32::System::Threading::GetCurrentProcess(),
+            usize::MAX,
+            usize::MAX,
+        );
+    }
+}
+
+    // 3. 点击右上角 [X] 缩小至系统托盘，不退出应用并修剪工作集
     main_window.window().on_close_requested({
         let ui_weak = main_window.as_weak();
         move || {
             if let Some(ui) = ui_weak.upgrade() {
                 let _ = ui.hide();
+                #[cfg(target_os = "windows")]
+                trim_working_set();
             }
             CloseRequestResponse::KeepWindowShown
         }
@@ -258,6 +271,13 @@ pub fn run_gui() -> Result<()> {
             // 更新聚合总内存与时钟
             ui.set_total_ram(format!("{:.1} MB", mon.total_memory_mb).into());
             ui.set_current_time(chrono::Local::now().format("%H:%M:%S").to_string().into());
+
+            static TICK_COUNT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+            let ticks = TICK_COUNT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            if ticks == 2 || (ticks > 0 && ticks % 30 == 0) {
+                #[cfg(target_os = "windows")]
+                trim_working_set();
+            }
         }
     });
 
