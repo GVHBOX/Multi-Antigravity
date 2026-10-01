@@ -1,0 +1,6 @@
+/target
+/data
+*.pdb
+*.png
+*.WebView2/
+*.exe
