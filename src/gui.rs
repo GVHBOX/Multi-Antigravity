@@ -34,12 +34,10 @@ pub fn run_gui() -> Result<()> {
         .build()?;
 
     // 2. 托盘事件监听与跨线程派发
-    let ui_weak_tray = main_window.as_weak();
     let config_tray = Arc::clone(&config);
     let sub_pid_tray = Arc::clone(&sub_pid);
 
     tray_icon::TrayIconEvent::set_event_handler(Some({
-        let ui_weak = ui_weak_tray.clone();
         move |event| {
             if let tray_icon::TrayIconEvent::Click {
                 button: tray_icon::MouseButton::Left,
@@ -51,28 +49,19 @@ pub fn run_gui() -> Result<()> {
                 ..
             } = event
             {
-                let ui_weak = ui_weak.clone();
-                let _ = slint::invoke_from_event_loop(move || {
-                    if let Some(ui) = ui_weak.upgrade() {
-                        let _ = ui.show();
-                    }
-                });
+                #[cfg(target_os = "windows")]
+                show_cockpit_from_tray();
             }
         }
     }));
 
     tray_icon::menu::MenuEvent::set_event_handler(Some({
-        let ui_weak = ui_weak_tray.clone();
         let conf = config_tray;
         let pid_lock = sub_pid_tray;
         move |event: tray_icon::menu::MenuEvent| {
             if event.id == show_id {
-                let ui_weak = ui_weak.clone();
-                let _ = slint::invoke_from_event_loop(move || {
-                    if let Some(ui) = ui_weak.upgrade() {
-                        let _ = ui.show();
-                    }
-                });
+                #[cfg(target_os = "windows")]
+                show_cockpit_from_tray();
             } else if event.id == sub_id {
                 let conf = conf.clone();
                 let pid_lock = pid_lock.clone();
@@ -102,15 +91,65 @@ fn trim_working_set() {
     }
 }
 
+#[cfg(target_os = "windows")]
+fn get_cockpit_hwnd() -> windows_sys::Win32::Foundation::HWND {
+    use windows_sys::Win32::Foundation::{HWND, LPARAM};
+    use windows_sys::Win32::System::Threading::GetCurrentProcessId;
+    use windows_sys::Win32::UI::WindowsAndMessaging::{EnumWindows, GetWindowThreadProcessId};
+
+    unsafe extern "system" fn enum_proc(hwnd: HWND, lparam: LPARAM) -> i32 {
+        unsafe {
+            let mut proc_id = 0u32;
+            GetWindowThreadProcessId(hwnd, &mut proc_id);
+            if proc_id == GetCurrentProcessId() {
+                let out_ptr = lparam as *mut HWND;
+                *out_ptr = hwnd;
+                0 // 停止枚举，找到了
+            } else {
+                1 // 继续枚举
+            }
+        }
+    }
+
+    let mut found_hwnd: HWND = std::ptr::null_mut();
+    unsafe {
+        EnumWindows(Some(enum_proc), &mut found_hwnd as *mut _ as LPARAM);
+    }
+    found_hwnd
+}
+
+#[cfg(target_os = "windows")]
+fn hide_cockpit_to_tray() {
+    use windows_sys::Win32::UI::WindowsAndMessaging::{ShowWindow, SW_HIDE};
+    let hwnd = get_cockpit_hwnd();
+    if !hwnd.is_null() {
+        unsafe {
+            ShowWindow(hwnd, SW_HIDE);
+        }
+    }
+    trim_working_set();
+}
+
+#[cfg(target_os = "windows")]
+fn show_cockpit_from_tray() {
+    use windows_sys::Win32::UI::WindowsAndMessaging::{
+        SetForegroundWindow, ShowWindow, SW_RESTORE, SW_SHOW,
+    };
+    let hwnd = get_cockpit_hwnd();
+    if !hwnd.is_null() {
+        unsafe {
+            ShowWindow(hwnd, SW_SHOW);
+            ShowWindow(hwnd, SW_RESTORE);
+            SetForegroundWindow(hwnd);
+        }
+    }
+}
+
     // 3. 点击右上角 [X] 缩小至系统托盘，不退出应用并修剪工作集
     main_window.window().on_close_requested({
-        let ui_weak = main_window.as_weak();
         move || {
-            if let Some(ui) = ui_weak.upgrade() {
-                let _ = ui.hide();
-                #[cfg(target_os = "windows")]
-                trim_working_set();
-            }
+            #[cfg(target_os = "windows")]
+            hide_cockpit_to_tray();
             CloseRequestResponse::KeepWindowShown
         }
     });
@@ -274,13 +313,14 @@ fn trim_working_set() {
 
             static TICK_COUNT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
             let ticks = TICK_COUNT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-            if ticks == 2 || (ticks > 0 && ticks % 30 == 0) {
+            if ticks == 2 || (ticks > 0 && ticks.is_multiple_of(30)) {
                 #[cfg(target_os = "windows")]
                 trim_working_set();
             }
         }
     });
 
-    main_window.run()?;
+    main_window.show()?;
+    let _ = slint::run_event_loop();
     Ok(())
 }
