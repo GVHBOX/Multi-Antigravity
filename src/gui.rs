@@ -85,22 +85,6 @@ pub fn run_gui() -> Result<()> {
     }));
 
 #[cfg(target_os = "windows")]
-fn ensure_dark_background(hwnd: windows_sys::Win32::Foundation::HWND) {
-    use windows_sys::Win32::Graphics::Gdi::CreateSolidBrush;
-    use windows_sys::Win32::UI::WindowsAndMessaging::{SetClassLongPtrW, GCLP_HBRBACKGROUND};
-
-    if !hwnd.is_null() {
-        unsafe {
-            // 0x000E0907 -> BGR 对应 #07090e，从底层将窗口类画刷设为极客深黑，根治任何白色擦除闪烁
-            let dark_brush = CreateSolidBrush(0x000E0907);
-            if !dark_brush.is_null() {
-                SetClassLongPtrW(hwnd, GCLP_HBRBACKGROUND, dark_brush as isize);
-            }
-        }
-    }
-}
-
-#[cfg(target_os = "windows")]
 fn trim_working_set() {
     unsafe {
         windows_sys::Win32::System::Threading::SetProcessWorkingSetSize(
@@ -139,51 +123,46 @@ fn get_cockpit_hwnd() -> windows_sys::Win32::Foundation::HWND {
 }
 
 #[cfg(target_os = "windows")]
-fn hide_cockpit_to_tray() {
-    use windows_sys::Win32::UI::WindowsAndMessaging::{ShowWindow, SW_HIDE};
-    let hwnd = get_cockpit_hwnd();
-    if !hwnd.is_null() {
-        unsafe {
-            ShowWindow(hwnd, SW_HIDE);
-        }
+fn hide_cockpit_to_tray(ui_weak: &slint::Weak<MainWindow>) {
+    if let Some(ui) = ui_weak.upgrade() {
+        let _ = ui.window().hide();
     }
     trim_working_set();
 }
 
 #[cfg(target_os = "windows")]
 fn show_cockpit_from_tray(ui_weak: &slint::Weak<MainWindow>) {
-    use windows_sys::Win32::Graphics::Gdi::InvalidateRect;
     use windows_sys::Win32::UI::WindowsAndMessaging::{
-        IsIconic, SetForegroundWindow, ShowWindow, SW_RESTORE, SW_SHOW,
+        IsIconic, SetForegroundWindow, ShowWindow, SW_RESTORE,
     };
 
-    let hwnd = get_cockpit_hwnd();
-    if !hwnd.is_null() {
-        ensure_dark_background(hwnd);
-        unsafe {
-            if IsIconic(hwnd) != 0 {
-                ShowWindow(hwnd, SW_RESTORE);
-            } else {
-                ShowWindow(hwnd, SW_SHOW);
-            }
-            SetForegroundWindow(hwnd);
-            InvalidateRect(hwnd, std::ptr::null(), 0);
-        }
-    }
-
-    let ui_weak_clone = ui_weak.clone();
+    let ui_weak = ui_weak.clone();
     let _ = slint::invoke_from_event_loop(move || {
-        if let Some(ui) = ui_weak_clone.upgrade() {
-            ui.window().request_redraw();
+        let Some(ui) = ui_weak.upgrade() else {
+            return;
+        };
+        let window = ui.window();
+        let _ = window.show();
+
+        let hwnd = get_cockpit_hwnd();
+        if !hwnd.is_null() {
+            unsafe {
+                if IsIconic(hwnd) != 0 {
+                    ShowWindow(hwnd, SW_RESTORE);
+                }
+                SetForegroundWindow(hwnd);
+            }
         }
+        window.request_redraw();
     });
 }
 
     // 3. 点击右上角 [X] 缩小至系统托盘，不退出应用并修剪工作集
     main_window.window().on_close_requested({
+        let ui_weak = main_window.as_weak();
         move || {
             #[cfg(target_os = "windows")]
-            hide_cockpit_to_tray();
+            hide_cockpit_to_tray(&ui_weak);
             CloseRequestResponse::KeepWindowShown
         }
     });
@@ -355,11 +334,6 @@ fn show_cockpit_from_tray(ui_weak: &slint::Weak<MainWindow>) {
     });
 
     main_window.show()?;
-    #[cfg(target_os = "windows")]
-    {
-        let hwnd = get_cockpit_hwnd();
-        ensure_dark_background(hwnd);
-    }
-    let _ = slint::run_event_loop();
+    let _ = slint::run_event_loop_until_quit();
     Ok(())
 }
