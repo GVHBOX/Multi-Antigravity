@@ -129,7 +129,13 @@ python tools/ui_probe.py kill <pid>
   （README 里也写了这步）。exe 不进版本库。
 - **`target/` 5.2 GB 不动**：D 盘剩 450 GB，占 1.2%；清掉要换 2~5 分钟全量重编（增量只要 20 秒 / 57 秒）。
   真要省就只删 `target/debug`。
-- Slint 1.18 里 `ScrollView` 的 `viewport-y` **已废弃**，用 `content-y`。
+- Slint 1.18 里 `ScrollView` 的 `viewport-y` **已废弃**，用 `content-y`（`viewport-height` → `content-height`）。
+- **Slint 的 `VerticalLayout` 默认把剩余高度平均分配给子元素**：容器高度写死且大于内容时，
+  行距会被撑开、且按子元素类型分配得还不均匀（含进度条的行涨得少）。内容要紧凑就给它加
+  `alignment: start;`，或者干脆别写死容器高度、让它按内容自适应。
+  实例卡踩过：固定 260px + 四行参数 → 行距变成 80/80/21。
+- **`ScrollView` 里内容不足时不会贴顶**（有固定偏移）。日志区已改成 `clip: true` 容器 +
+  `y: min(0px, parent.height - self.height)`：内容少贴顶、超出自动贴底显示最新行。
 - Bash 里不能出现 "PowerShell" 字样（会被安全策略拦），要跑就用 PowerShell 工具。
 
 ## 边界
