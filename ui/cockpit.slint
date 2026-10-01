@@ -179,6 +179,10 @@ export component MainWindow inherits Window {
     forward-focus: focus_scope;
 
     focus_scope := FocusScope {
+        x: 0;
+        y: 0;
+        width: 0;
+        height: 0;
         key-pressed(event) => {
             if (event.text == " ") {
                 root.action_space();
@@ -202,10 +206,11 @@ export component MainWindow inherits Window {
                 reject
             }
         }
+    }
 
-        VerticalLayout {
-            padding: 14px;
-            spacing: 12px;
+    VerticalLayout {
+        padding: 14px;
+        spacing: 12px;
 
         // 1. 顶部 Header
         Rectangle {
@@ -702,5 +707,4 @@ export component MainWindow inherits Window {
             }
         }
     }
-}
 }

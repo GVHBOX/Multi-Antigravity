@@ -154,48 +154,19 @@ fn hide_cockpit_to_tray() {
 fn show_cockpit_from_tray(ui_weak: &slint::Weak<MainWindow>) {
     use windows_sys::Win32::Graphics::Gdi::InvalidateRect;
     use windows_sys::Win32::UI::WindowsAndMessaging::{
-        GetWindowRect, SetForegroundWindow, SetWindowPos, ShowWindow, SWP_NOACTIVATE,
-        SWP_NOMOVE, SWP_NOZORDER, SW_RESTORE, SW_SHOW,
+        IsIconic, SetForegroundWindow, ShowWindow, SW_RESTORE, SW_SHOW,
     };
 
     let hwnd = get_cockpit_hwnd();
     if !hwnd.is_null() {
         ensure_dark_background(hwnd);
         unsafe {
-            ShowWindow(hwnd, SW_SHOW);
-            ShowWindow(hwnd, SW_RESTORE);
-            SetForegroundWindow(hwnd);
-
-            // 尺寸微调 1 像素强制触发布局与软渲染 Surface 全量重绘
-            let mut rect = windows_sys::Win32::Foundation::RECT {
-                left: 0,
-                top: 0,
-                right: 0,
-                bottom: 0,
-            };
-            GetWindowRect(hwnd, &mut rect);
-            let w = rect.right - rect.left;
-            let h = rect.bottom - rect.top;
-            if w > 0 && h > 0 {
-                SetWindowPos(
-                    hwnd,
-                    std::ptr::null_mut(),
-                    0,
-                    0,
-                    w + 1,
-                    h,
-                    SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE,
-                );
-                SetWindowPos(
-                    hwnd,
-                    std::ptr::null_mut(),
-                    0,
-                    0,
-                    w,
-                    h,
-                    SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE,
-                );
+            if IsIconic(hwnd) != 0 {
+                ShowWindow(hwnd, SW_RESTORE);
+            } else {
+                ShowWindow(hwnd, SW_SHOW);
             }
+            SetForegroundWindow(hwnd);
             InvalidateRect(hwnd, std::ptr::null(), 0);
         }
     }
