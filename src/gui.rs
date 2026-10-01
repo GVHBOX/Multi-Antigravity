@@ -357,6 +357,33 @@ fn show_cockpit_from_tray(ui_weak: &slint::Weak<MainWindow>) {
         }
     });
 
+    let sandbox_path = match config.lock() {
+        Ok(c) => {
+            let path = c.sandbox_root.display().to_string();
+            main_window.set_sandbox_root(path.clone().into());
+            path
+        }
+        Err(_) => "--".to_string(),
+    };
+
+    {
+        let host_line = {
+            let mut mon = monitor.lock().unwrap();
+            mon.refresh(None);
+            if mon.host.is_running {
+                match mon.host.electron_pid {
+                    Some(pid) => format!("主机实例已识别 (PID: {pid})"),
+                    None => "主机实例已识别".to_string(),
+                }
+            } else {
+                "未检测到主机实例进程".to_string()
+            }
+        };
+        append_log(&main_window, "SYSTEM", "Slint 原生 GUI 内核初始化完成");
+        append_log(&main_window, "SANDBOX", &format!("沙箱根目录: {sandbox_path}"));
+        append_log(&main_window, "MONITOR", &host_line);
+    }
+
     main_window.show()?;
     let _ = slint::run_event_loop_until_quit();
     Ok(())
