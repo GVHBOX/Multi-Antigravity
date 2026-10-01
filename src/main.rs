@@ -34,7 +34,6 @@ fn main() -> Result<()> {
     let use_tui = args.iter().any(|a| a == "--tui" || a == "-t");
 
     if !use_tui {
-        // Default to ultra-lightweight software renderer to bypass heavy NVIDIA GPU driver overhead (nvgpucomp64 100MB+)
         if env::var("SLINT_BACKEND").is_err() {
             unsafe {
                 env::set_var("SLINT_BACKEND", "winit-software");
@@ -43,7 +42,6 @@ fn main() -> Result<()> {
         return gui::run_gui();
     }
 
-    // Attach to existing console if invoked from terminal with --tui
     #[cfg(windows)]
     unsafe {
         use windows_sys::Win32::System::Console::{AttachConsole, ATTACH_PARENT_PROCESS};
@@ -51,7 +49,6 @@ fn main() -> Result<()> {
     }
 
     setup_panic_hook();
-
 
     let mut app = App::new()?;
 

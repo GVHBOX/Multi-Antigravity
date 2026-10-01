@@ -16,7 +16,6 @@ pub fn run_gui() -> Result<()> {
 
     let main_window = MainWindow::new()?;
 
-    // 1. 系统托盘与右键菜单构建
     const ICON_RGBA: &[u8] = include_bytes!("../assets/icon_32.rgba");
     let tray_menu = tray_icon::menu::Menu::new();
     let item_show = tray_icon::menu::MenuItem::new("显示座舱 (Show Cockpit)", true, None);
@@ -37,7 +36,6 @@ pub fn run_gui() -> Result<()> {
         .with_icon(tray_icon_img)
         .build()?;
 
-    // 2. 托盘事件监听与跨线程派发
     let config_tray = Arc::clone(&config);
     let sub_pid_tray = Arc::clone(&sub_pid);
     let ui_weak_tray = main_window.as_weak();
@@ -111,9 +109,9 @@ fn get_cockpit_hwnd() -> windows_sys::Win32::Foundation::HWND {
             if proc_id == GetCurrentProcessId() {
                 let out_ptr = lparam as *mut HWND;
                 *out_ptr = hwnd;
-                0 // 停止枚举，找到了
+                0
             } else {
-                1 // 继续枚举
+                1
             }
         }
     }
@@ -160,7 +158,6 @@ fn show_cockpit_from_tray(ui_weak: &slint::Weak<MainWindow>) {
     });
 }
 
-    // 3. 点击右上角 [X] 缩小至系统托盘，不退出应用并修剪工作集
     main_window.window().on_close_requested({
         let ui_weak = main_window.as_weak();
         move || {
@@ -170,7 +167,6 @@ fn show_cockpit_from_tray(ui_weak: &slint::Weak<MainWindow>) {
         }
     });
 
-    // 4. 绑定 UI 回调与按键动作
     let log_buffer: Rc<RefCell<VecDeque<String>>> =
         Rc::new(RefCell::new(VecDeque::with_capacity(250)));
     let append_log = {
@@ -186,7 +182,6 @@ fn show_cockpit_from_tray(ui_weak: &slint::Weak<MainWindow>) {
         }
     };
 
-    // Space
     main_window.on_action_space({
         let ui_weak = main_window.as_weak();
         let conf = Arc::clone(&config);
@@ -219,7 +214,6 @@ fn show_cockpit_from_tray(ui_weak: &slint::Weak<MainWindow>) {
         }
     });
 
-    // K
     main_window.on_action_kill({
         let ui_weak = main_window.as_weak();
         let conf = Arc::clone(&config);
@@ -244,7 +238,6 @@ fn show_cockpit_from_tray(ui_weak: &slint::Weak<MainWindow>) {
         }
     });
 
-    // R
     main_window.on_action_restart({
         let ui_weak = main_window.as_weak();
         let conf = Arc::clone(&config);
@@ -269,7 +262,6 @@ fn show_cockpit_from_tray(ui_weak: &slint::Weak<MainWindow>) {
         }
     });
 
-    // C
     main_window.on_action_clear({
         let ui_weak = main_window.as_weak();
         let conf = Arc::clone(&config);
@@ -293,7 +285,6 @@ fn show_cockpit_from_tray(ui_weak: &slint::Weak<MainWindow>) {
         }
     });
 
-    // O
     main_window.on_action_open({
         let ui_weak = main_window.as_weak();
         let conf = Arc::clone(&config);
@@ -308,14 +299,12 @@ fn show_cockpit_from_tray(ui_weak: &slint::Weak<MainWindow>) {
         }
     });
 
-    // Q
     main_window.on_action_quit({
         move || {
             std::process::exit(0);
         }
     });
 
-    // 5. 1秒高精度实时指标刷新定时器
     let timer = Timer::default();
     let ui_weak_mon = main_window.as_weak();
     let monitor_timer = Arc::clone(&monitor);
@@ -332,7 +321,6 @@ fn show_cockpit_from_tray(ui_weak: &slint::Weak<MainWindow>) {
                 *sub_pid_mon.lock().unwrap() = None;
             }
 
-            // 更新 Host 指标
             ui.set_host_running(mon.host.is_running);
             ui.set_host_cpu(mon.host.cpu_usage);
             ui.set_host_ram(mon.host.memory_rss_mb as f32);
@@ -342,7 +330,6 @@ fn show_cockpit_from_tray(ui_weak: &slint::Weak<MainWindow>) {
                 ui.set_host_port("--".into());
             }
 
-            // 更新 Sub 指标
             ui.set_sub_running(mon.sub.is_running);
             if let Some(pid) = mon.sub.electron_pid {
                 ui.set_sub_pid(pid.to_string().into());
@@ -357,7 +344,6 @@ fn show_cockpit_from_tray(ui_weak: &slint::Weak<MainWindow>) {
             ui.set_sub_cpu(mon.sub.cpu_usage);
             ui.set_sub_ram(mon.sub.memory_rss_mb as f32);
 
-            // 更新聚合总内存与时钟
             ui.set_total_ram(format!("{:.1} MB", mon.total_memory_mb).into());
             ui.set_current_time(chrono::Local::now().format("%H:%M:%S").to_string().into());
 

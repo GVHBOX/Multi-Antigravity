@@ -96,6 +96,15 @@ multi-antigravity-rust/
 ├── antigravity-cockpit.exe  # 编译发布的 Windows 原生客户端 (零 Chromium)
 ├── build.rs                # Windows PE 资源编译 (winres) 与 Slint 编译 (slint-build)
 ├── Cargo.toml              # 项目依赖配置
+├── AGENTS.md               # 作业规程（4 条铁律、项目纪律、环境事实）
+├── tools/                  # 铁律机器强制扫描器（零注释 / 界面文案）
 ├── start.bat               # 原生 GUI 一键启动脚本
 └── start_tui.bat           # 终端 TUI 一键启动脚本
+
+自检（AGENTS.md 铁律的机器强制）：
+
+```powershell
+python tools/scan_comment.py
+python tools/check_front_hygiene.py
+```
 ```

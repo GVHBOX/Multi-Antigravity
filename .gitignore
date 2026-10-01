@@ -1,5 +1,6 @@
 /target
 /data
+/.scratch
 *.pdb
 *.png
 !assets/icon.png

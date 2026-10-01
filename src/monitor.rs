@@ -88,7 +88,6 @@ impl TelemetryMonitor {
                 .collect::<Vec<_>>()
                 .join(" ");
 
-            // Determine whether this process belongs to sub-instance or host
             let is_sub = cmd_line.contains("instance_2")
                 || known_sub_pid == Some(pid_u32)
                 || (proc.parent().map(|p| p.as_u32()) == known_sub_pid && known_sub_pid.is_some());
@@ -99,7 +98,6 @@ impl TelemetryMonitor {
                 if is_main_electron && sub_electron_pid.is_none() {
                     sub_electron_pid = Some(pid_u32);
                 } else if is_antigravity && sub_electron_pid.is_none() {
-                    // Fallback if cmd line was empty or unreadable
                     sub_electron_pid = Some(pid_u32);
                 } else if is_ls && sub_ls_pid.is_none() {
                     sub_ls_pid = Some(pid_u32);
@@ -110,7 +108,6 @@ impl TelemetryMonitor {
                 if is_main_electron && host_electron_pid.is_none() {
                     host_electron_pid = Some(pid_u32);
                 } else if is_antigravity && host_electron_pid.is_none() {
-                    // Fallback
                     host_electron_pid = Some(pid_u32);
                 } else if is_ls && host_ls_pid.is_none() {
                     host_ls_pid = Some(pid_u32);
@@ -120,14 +117,12 @@ impl TelemetryMonitor {
             }
         }
 
-        // Update host port cache
         if host_ls_pid != self.cached_host_ls_pid || !self.host_port_probed {
             self.cached_host_ls_pid = host_ls_pid;
             self.host_port_probed = true;
             self.cached_host_port = host_ls_pid.and_then(detect_listening_port);
         }
 
-        // Update sub port cache
         if sub_ls_pid != self.cached_sub_ls_pid || !self.sub_port_probed {
             self.cached_sub_ls_pid = sub_ls_pid;
             self.sub_port_probed = true;

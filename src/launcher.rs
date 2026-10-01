@@ -5,10 +5,6 @@ use std::os::windows::process::CommandExt;
 use std::path::PathBuf;
 use std::process::Command;
 
-// Win32 Process Creation Flags
-// 0x00000008: DETACHED_PROCESS (creates a process with no console window / detached from caller)
-// 0x01000000: CREATE_BREAKAWAY_FROM_JOB (allows the process to breakaway from any job object)
-// 0x00000200: CREATE_NEW_PROCESS_GROUP (creates a new process group, immune to Ctrl+C/Ctrl+Break)
 const WIN32_DETACHED_FLAGS: u32 = 0x01000208;
 
 pub struct LauncherConfig {
@@ -27,7 +23,6 @@ impl LauncherConfig {
         let roaming_dir = sandbox_root.join("AppData").join("Roaming");
         let token_path = home_dir.join(".gemini").join("jetski-standalone-oauth-token");
 
-        // Locate Antigravity.exe
         let local_app_data = env::var("LOCALAPPDATA").context("LOCALAPPDATA is not set")?;
         let executable_path = PathBuf::from(local_app_data)
             .join("Programs")
@@ -87,27 +82,19 @@ impl LauncherConfig {
         let user_data_dir = self.roaming_dir.join("Antigravity");
         let user_data_arg = format!("--user-data-dir={}", user_data_dir.display());
 
-        // Spawn detached process
         let mut cmd = Command::new(&self.executable_path);
         cmd.arg(&user_data_arg);
 
-        // Environment isolation
         cmd.env("USERPROFILE", &self.home_dir);
         cmd.env("HOME", &self.home_dir);
         cmd.env("APPDATA", &self.roaming_dir);
 
-        // SSH_CONNECTION bypass hook: forces Language Server to store tokens in files (.gemini)
-        // instead of Windows Credential Manager, preventing any conflict with the host instance.
         cmd.env("SSH_CONNECTION", "127.0.0.1 50000 127.0.0.1 22");
 
-        // CRITICAL: DO NOT override LOCALAPPDATA. Keeping the real LOCALAPPDATA allows
-        // Chrome to open with the user's authentic local Chrome profile, enabling 1-click
-        // account selection without losing browser sessions.
         if let Ok(real_local) = env::var("LOCALAPPDATA") {
             cmd.env("LOCALAPPDATA", real_local);
         }
 
-        // Apply Win32 Detached flags
         cmd.creation_flags(WIN32_DETACHED_FLAGS);
 
         let child = cmd
@@ -118,7 +105,6 @@ impl LauncherConfig {
     }
 
     pub fn kill_sub_instance_by_pid(&self, pid: u32) -> Result<()> {
-        // Use taskkill /T /F to kill the entire process tree (Electron + LanguageServer)
         let _ = Command::new("taskkill")
             .args(["/PID", &pid.to_string(), "/T", "/F"])
             .creation_flags(WIN32_DETACHED_FLAGS)
@@ -148,9 +134,9 @@ impl LauncherConfig {
 
                     if process_id == state.target_pid && IsWindowVisible(hwnd) != 0 {
                         state.found_hwnd = hwnd;
-                        return 0; // stop enumerating
+                        return 0;
                     }
-                    1 // continue
+                    1
                 }
             }
 

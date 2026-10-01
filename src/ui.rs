@@ -8,7 +8,6 @@ use ratatui::{
     Frame,
 };
 
-// Modern Tokyo Night / Obsidian Palette
 const COLOR_BORDER_DEFAULT: Color = Color::Rgb(40, 48, 68);
 const COLOR_BORDER_ACTIVE: Color = Color::Rgb(56, 189, 248);
 const COLOR_BG_CARD: Color = Color::Rgb(11, 14, 22);
@@ -26,15 +25,14 @@ const COLOR_SLATE_DIM: Color = Color::Rgb(100, 116, 139);
 pub fn render(frame: &mut Frame, app: &App) {
     let size = frame.area();
 
-    // Compact single-screen layout (total height ~24 rows)
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(3), // Top Navigation Header
-            Constraint::Length(3), // 4 Top KPI Badges
-            Constraint::Length(8), // Dual Instance Split Cards
-            Constraint::Min(8),    // Horizontal Split: Sandbox Matrix (42%) + Diagnostics (58%)
-            Constraint::Length(3), // Modern Command Action Dock
+            Constraint::Length(3),
+            Constraint::Length(3),
+            Constraint::Length(8),
+            Constraint::Min(8),
+            Constraint::Length(3),
         ])
         .split(size);
 
@@ -42,12 +40,11 @@ pub fn render(frame: &mut Frame, app: &App) {
     render_kpi_tiles(frame, chunks[1], app);
     render_dual_instances(frame, chunks[2], app);
 
-    // Horizontal split for lower section
     let lower_chunks = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([
-            Constraint::Percentage(44), // Sandbox Environment Inspector
-            Constraint::Percentage(56), // Diagnostics Stream
+            Constraint::Percentage(44),
+            Constraint::Percentage(56),
         ])
         .split(chunks[3]);
 
@@ -110,7 +107,6 @@ fn render_kpi_tiles(frame: &mut Frame, area: Rect, app: &App) {
         ])
         .split(area);
 
-    // Tile 1: Host Status
     let host_online = app.monitor.host.is_running;
     let host_pid_str = app.monitor.host.electron_pid.map(|p| format!("PID: {}", p)).unwrap_or_else(|| "--".into());
     let t1_content = Line::from(vec![
@@ -131,7 +127,6 @@ fn render_kpi_tiles(frame: &mut Frame, area: Rect, app: &App) {
         tiles[0],
     );
 
-    // Tile 2: Sub Detached Status
     let sub_online = app.monitor.sub.is_running;
     let sub_pid_str = app.monitor.sub.electron_pid.map(|p| format!("PID: {}", p)).unwrap_or_else(|| "--".into());
     let t2_content = Line::from(vec![
@@ -152,7 +147,6 @@ fn render_kpi_tiles(frame: &mut Frame, area: Rect, app: &App) {
         tiles[1],
     );
 
-    // Tile 3: Total RAM
     let host_mem = app.monitor.host.memory_rss_mb;
     let sub_mem = app.monitor.sub.memory_rss_mb;
     let t3_content = Line::from(vec![
@@ -172,7 +166,6 @@ fn render_kpi_tiles(frame: &mut Frame, area: Rect, app: &App) {
         tiles[2],
     );
 
-    // Tile 4: Isolation Level
     let t4_content = Line::from(vec![
         Span::styled(s.tile_iso_level, Style::default().fg(COLOR_PURPLE).bold()),
         Span::raw(" "),
@@ -198,7 +191,6 @@ fn render_dual_instances(frame: &mut Frame, area: Rect, app: &App) {
         .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
         .split(area);
 
-    // 1. Host Instance Box
     let host = &app.monitor.host;
     let host_pid_text = match (host.electron_pid, host.ls_pid) {
         (Some(e), Some(ls)) => format!("Electron ({}) + GoLS ({})", e, ls),
@@ -248,7 +240,6 @@ fn render_dual_instances(frame: &mut Frame, area: Rect, app: &App) {
         cols[0],
     );
 
-    // 2. Sub Instance Box
     let sub = &app.monitor.sub;
     let sub_pid_text = match (sub.electron_pid, sub.ls_pid) {
         (Some(e), Some(ls)) => format!("Detached ({}) + GoLS ({})", e, ls),

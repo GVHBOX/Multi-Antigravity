@@ -1,6 +1,5 @@
 import { ScrollView } from "std-widgets.slint";
 
-// 可复用的极客微状态胶囊组件
 component StatusPill inherits Rectangle {
     in property <string> text;
     in property <color> pill_color: #38bdf8;
@@ -36,7 +35,6 @@ component StatusPill inherits Rectangle {
     }
 }
 
-// 顶部指标小卡片
 component KpiCard inherits Rectangle {
     in property <string> title;
     in property <string> value;
@@ -84,7 +82,6 @@ component KpiCard inherits Rectangle {
     }
 }
 
-// 底部操作按键组件
 component KeyButton inherits Rectangle {
     in property <string> key_label;
     in property <string> action_label;
@@ -144,14 +141,12 @@ export component MainWindow inherits Window {
     min-height: 640px;
     background: #07090e;
 
-    // 数据绑定属性
     in property <string> app_title: "Antigravity 开发者座舱";
     in property <string> app_subtitle: "多实例调度与环境隔离系统";
     in property <string> kernel_status: "Slint 原生矢量渲染就绪";
     in property <string> ram_overhead: "开销: --";
     in property <string> current_time: "--:--:--";
 
-    // 实例遥测
     in property <bool> host_running: false;
     in property <string> host_port: "--";
     in property <float> host_cpu: 0.8;
@@ -168,7 +163,6 @@ export component MainWindow inherits Window {
 
     in property <string> log_content: "[READY] Slint 原生 GUI 内核初始化完毕。\n[INFO] 按键已全局绑定：Space 启动分身，K 停止，C 换号。";
 
-    // 回调事件
     callback action_space();
     callback action_kill();
     callback action_restart();
@@ -212,7 +206,6 @@ export component MainWindow inherits Window {
         padding: 14px;
         spacing: 12px;
 
-        // 1. 顶部 Header
         Rectangle {
             background: #0e121b;
             border-color: #1e293b;
@@ -226,7 +219,6 @@ export component MainWindow inherits Window {
                 spacing: 12px;
                 alignment: space-between;
 
-                // 左侧 Logo + 标题
                 HorizontalLayout {
                     spacing: 10px;
                     alignment: start;
@@ -264,7 +256,6 @@ export component MainWindow inherits Window {
                     }
                 }
 
-                // 右侧状态胶囊
                 HorizontalLayout {
                     spacing: 8px;
                     alignment: end;
@@ -304,7 +295,6 @@ export component MainWindow inherits Window {
             }
         }
 
-        // 2. 4 列 KPI 状态网格
         HorizontalLayout {
             spacing: 10px;
             height: 72px;
@@ -321,7 +311,7 @@ export component MainWindow inherits Window {
                 title: "分身脱机运行";
                 sub_left: root.sub_running ? "PID: " + root.sub_pid : "已停止";
                 value: root.sub_running ? "完全脱离" : "未启动";
-                sub_right: root.sub_running ? "本地服务 Port: " + root.sub_port : "按 Space 启动";
+                sub_right: root.sub_running ? "本地服务 Port: " + root.sub_port : "待启动";
                 val_color: root.sub_running ? #38bdf8 : #64748b;
             }
 
@@ -342,12 +332,10 @@ export component MainWindow inherits Window {
             }
         }
 
-        // 3. 中间双实例监控面板 (Host vs Sub)
         HorizontalLayout {
             spacing: 10px;
             height: 190px;
 
-            // Host 卡片
             Rectangle {
                 background: #0e121b;
                 border-color: #1e293b;
@@ -369,7 +357,6 @@ export component MainWindow inherits Window {
                         StatusPill { text: "宿主主会话"; pill_color: #34d399; show_dot: false; height: 20px; }
                     }
 
-                    // 参数列表
                     VerticalLayout {
                         spacing: 6px;
 
@@ -421,7 +408,6 @@ export component MainWindow inherits Window {
                 }
             }
 
-            // Sub 卡片
             Rectangle {
                 background: #0e121b;
                 border-color: root.sub_running ? #0284c7 : #1e293b;
@@ -454,7 +440,6 @@ export component MainWindow inherits Window {
                         }
                     }
 
-                    // 参数列表
                     VerticalLayout {
                         spacing: 6px;
 
@@ -507,12 +492,10 @@ export component MainWindow inherits Window {
             }
         }
 
-        // 4. 下半部分：沙箱目录矩阵 + 诊断终端日志流
         HorizontalLayout {
             spacing: 10px;
             vertical-stretch: 1;
 
-            // 左侧：沙箱隔离环境检视器
             Rectangle {
                 background: #0e121b;
                 border-color: #1e293b;
@@ -530,7 +513,6 @@ export component MainWindow inherits Window {
                         Text { text: "data/instance_2"; color: #64748b; font-size: 10px; }
                     }
 
-                    // 4 项环境路径
                     VerticalLayout {
                         spacing: 6px;
 
@@ -593,7 +575,6 @@ export component MainWindow inherits Window {
                 }
             }
 
-            // 右侧：实时诊断控制台
             Rectangle {
                 background: #05070c;
                 border-color: #1e293b;
@@ -632,7 +613,6 @@ export component MainWindow inherits Window {
             }
         }
 
-        // 5. 底部动作工具栏 (Action Bar + Toast)
         VerticalLayout {
             spacing: 8px;
 
@@ -684,7 +664,6 @@ export component MainWindow inherits Window {
                 }
             }
 
-            // 状态提示条
             Rectangle {
                 background: #0e121b;
                 border-color: #1e293b;

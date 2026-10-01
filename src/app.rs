@@ -88,14 +88,12 @@ impl App {
     pub fn refresh(&mut self) {
         self.monitor.refresh(self.sub_known_pid);
 
-        // Update known sub PID if monitor found it running
         if let Some(pid) = self.monitor.sub.electron_pid {
             self.sub_known_pid = Some(pid);
         } else if !self.monitor.sub.is_running {
             self.sub_known_pid = None;
         }
 
-        // Measure launcher's own memory (using current PID)
         let current_pid = std::process::id();
         self.sys.refresh_processes(sysinfo::ProcessesToUpdate::Some(&[sysinfo::Pid::from_u32(current_pid)]), true);
         if let Some(proc) = self.sys.process(sysinfo::Pid::from_u32(current_pid)) {
@@ -105,7 +103,6 @@ impl App {
 
     pub fn launch_or_bring_to_front(&mut self) {
         if let Some(pid) = self.sub_known_pid {
-            // Already running, bring to front
             let brought = self.config.bring_to_front(pid);
             if brought {
                 let msg = if self.language == Language::Zh {
@@ -125,7 +122,6 @@ impl App {
                 self.set_toast(msg, false);
             }
         } else {
-            // Spawn detached sub-instance
             match self.config.spawn_detached() {
                 Ok(new_pid) => {
                     self.sub_known_pid = Some(new_pid);
@@ -188,9 +184,9 @@ impl App {
             self.set_toast(msg, false);
         } else {
             let msg = if self.language == Language::Zh {
-                "分身尚未启动，请先按 [Space] 启动分身。"
+                "分身未在运行，无语言服务可回收。"
             } else {
-                "Sub-instance not started. Press [Space] to start."
+                "Sub-instance is not running, no language server to recycle."
             };
             self.set_toast(msg, true);
         }
