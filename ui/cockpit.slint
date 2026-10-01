@@ -1,5 +1,3 @@
-import { ScrollView } from "std-widgets.slint";
-
 component StatusPill inherits Rectangle {
     in property <string> text;
     in property <color> pill_color: #38bdf8;
@@ -631,18 +629,19 @@ export component MainWindow inherits Window {
                         background: #07090e;
                         border-color: #1e293b;
                         border-width: 1px;
-                        border-radius: 5px;
+                        border-radius: 8px;
                         vertical-stretch: 1;
+                        clip: true;
 
-                        ScrollView {
-                            content-y: -log_text.height;
-                            log_text := Text {
-                                text: root.log_content;
-                                color: #cbd5e1;
-                                font-size: 13px;
-                                font-family: "Cascadia Mono";
-                                wrap: word-wrap;
-                            }
+                        log_text := Text {
+                            x: 14px;
+                            width: parent.width - 28px;
+                            y: min(0px, parent.height - self.height);
+                            text: root.log_content;
+                            color: #cbd5e1;
+                            font-size: 13px;
+                            font-family: "Cascadia Mono";
+                            wrap: word-wrap;
                         }
                     }
                 }
