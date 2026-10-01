@@ -1,0 +1,704 @@
+import { ScrollView } from "std-widgets.slint";
+
+// 可复用的极客微状态胶囊组件
+component StatusPill inherits Rectangle {
+    in property <string> text;
+    in property <color> pill_color: #38bdf8;
+    in property <bool> show_dot: true;
+
+    background: pill_color.transparentize(88%);
+    border-color: pill_color.transparentize(65%);
+    border-width: 1px;
+    border-radius: 6px;
+    height: 26px;
+
+    HorizontalLayout {
+        padding-left: 10px;
+        padding-right: 10px;
+        spacing: 6px;
+        alignment: center;
+
+        if show_dot : Rectangle {
+            width: 6px;
+            height: 6px;
+            border-radius: 3px;
+            background: pill_color;
+            y: (parent.height - 6px) / 2;
+        }
+
+        Text {
+            text: root.text;
+            color: pill_color;
+            font-size: 11px;
+            font-weight: 600;
+            vertical-alignment: center;
+        }
+    }
+}
+
+// 顶部指标小卡片
+component KpiCard inherits Rectangle {
+    in property <string> title;
+    in property <string> value;
+    in property <string> sub_left;
+    in property <string> sub_right;
+    in property <color> val_color: #f1f5f9;
+    in property <color> highlight_color: #38bdf8;
+
+    background: #0e131f;
+    border-color: #1e293b;
+    border-width: 1px;
+    border-radius: 8px;
+
+    VerticalLayout {
+        padding: 10px;
+        spacing: 6px;
+
+        HorizontalLayout {
+            Text {
+                text: root.title;
+                color: #94a3b8;
+                font-size: 11px;
+                horizontal-alignment: left;
+            }
+            Text {
+                text: root.sub_left;
+                color: #64748b;
+                font-size: 10px;
+                horizontal-alignment: right;
+            }
+        }
+
+        Text {
+            text: root.value;
+            color: root.val_color;
+            font-size: 16px;
+            font-weight: 700;
+        }
+
+        Text {
+            text: root.sub_right;
+            color: #64748b;
+            font-size: 10px;
+        }
+    }
+}
+
+// 底部操作按键组件
+component KeyButton inherits Rectangle {
+    in property <string> key_label;
+    in property <string> action_label;
+    in property <color> accent_color: #38bdf8;
+    callback clicked();
+
+    background: ta.pressed ? #1e293b : (ta.has_hover ? #172033 : #0e131f);
+    border-color: ta.has_hover ? accent_color : #1e293b;
+    border-width: 1px;
+    border-radius: 6px;
+    height: 34px;
+
+    ta := TouchArea {
+        clicked => { root.clicked(); }
+    }
+
+    HorizontalLayout {
+        padding-left: 8px;
+        padding-right: 10px;
+        spacing: 7px;
+        alignment: center;
+
+        Rectangle {
+            background: #1e293b;
+            border-color: #334155;
+            border-width: 1px;
+            border-radius: 4px;
+            height: 18px;
+            width: root.key_label == "Space" ? 42px : 20px;
+            y: (parent.height - 18px) / 2;
+
+            Text {
+                text: root.key_label;
+                color: #cbd5e1;
+                font-size: 10px;
+                font-weight: 700;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+        }
+
+        Text {
+            text: root.action_label;
+            color: ta.has_hover ? #f8fafc : #cbd5e1;
+            font-size: 11px;
+            font-weight: 500;
+            vertical-alignment: center;
+        }
+    }
+}
+
+export component MainWindow inherits Window {
+    title: "Antigravity 开发者座舱 · Studio Cockpit (Slint Native)";
+    preferred-width: 1120px;
+    preferred-height: 740px;
+    min-width: 960px;
+    min-height: 640px;
+    background: #07090e;
+
+    // 数据绑定属性
+    in property <string> app_title: "Antigravity 开发者座舱";
+    in property <string> app_subtitle: "多实例调度与环境隔离系统";
+    in property <string> kernel_status: "Slint 原生硬件加速就绪";
+    in property <string> ram_overhead: "开销: 12.4 MB";
+    in property <string> current_time: "23:15:00";
+
+    // 实例遥测
+    in property <string> host_pid: "14820";
+    in property <string> host_port: "52103";
+    in property <float> host_cpu: 0.8;
+    in property <float> host_ram: 342.6;
+
+    in property <bool> sub_running: false;
+    in property <string> sub_pid: "--";
+    in property <string> sub_port: "--";
+    in property <float> sub_cpu: 0.0;
+    in property <float> sub_ram: 0.0;
+
+    in property <string> total_ram: "342.6 MB";
+    in property <string> toast_message: "极客原生架构：采用 Slint 硬件加速引擎自绘，零 Chromium 浏览器进程，内存占用骤降 85%。";
+
+    in property <string> log_content: "[READY] Slint 原生 GUI 内核初始化完毕。\n[HOST] 主机实例正在运行 (Port: 52103)。\n[INFO] 按键已全局绑定：Space 启动分身，K 停止，C 换号。";
+
+    // 回调事件
+    callback action_space();
+    callback action_kill();
+    callback action_restart();
+    callback action_clear();
+    callback action_open();
+    callback action_quit();
+
+    focus_scope := FocusScope {
+        key-pressed(event) => {
+            if (event.text == " ") {
+                root.action_space();
+                accept
+            } else if (event.text == "k" || event.text == "K") {
+                root.action_kill();
+                accept
+            } else if (event.text == "r" || event.text == "R") {
+                root.action_restart();
+                accept
+            } else if (event.text == "c" || event.text == "C") {
+                root.action_clear();
+                accept
+            } else if (event.text == "o" || event.text == "O") {
+                root.action_open();
+                accept
+            } else if (event.text == "q" || event.text == "Q") {
+                root.action_quit();
+                accept
+            } else {
+                reject
+            }
+        }
+    }
+
+    VerticalLayout {
+        padding: 14px;
+        spacing: 12px;
+
+        // 1. 顶部 Header
+        Rectangle {
+            background: #0e121b;
+            border-color: #1e293b;
+            border-width: 1px;
+            border-radius: 8px;
+            height: 52px;
+
+            HorizontalLayout {
+                padding-left: 14px;
+                padding-right: 14px;
+                spacing: 12px;
+                alignment: space-between;
+
+                // 左侧 Logo + 标题
+                HorizontalLayout {
+                    spacing: 10px;
+                    alignment: start;
+
+                    Image {
+                        source: @image-url("../assets/icon.png");
+                        width: 28px;
+                        height: 28px;
+                        y: (parent.height - 28px) / 2;
+                    }
+
+                    VerticalLayout {
+                        alignment: center;
+                        spacing: 2px;
+
+                        HorizontalLayout {
+                            spacing: 8px;
+                            Text {
+                                text: root.app_title;
+                                color: #f1f5f9;
+                                font-size: 14px;
+                                font-weight: 700;
+                            }
+                            Text {
+                                text: "/";
+                                color: #475569;
+                                font-size: 13px;
+                            }
+                            Text {
+                                text: root.app_subtitle;
+                                color: #94a3b8;
+                                font-size: 12px;
+                            }
+                        }
+                    }
+                }
+
+                // 右侧状态胶囊
+                HorizontalLayout {
+                    spacing: 8px;
+                    alignment: end;
+
+                    StatusPill {
+                        text: root.kernel_status;
+                        pill_color: #34d399;
+                        show_dot: true;
+                    }
+
+                    StatusPill {
+                        text: root.ram_overhead;
+                        pill_color: #38bdf8;
+                        show_dot: false;
+                    }
+
+                    Rectangle {
+                        background: #172033;
+                        border-color: #1e293b;
+                        border-width: 1px;
+                        border-radius: 6px;
+                        height: 26px;
+                        HorizontalLayout {
+                            padding-left: 8px;
+                            padding-right: 8px;
+                            alignment: center;
+                            Text {
+                                text: root.current_time;
+                                color: #38bdf8;
+                                font-size: 11px;
+                                font-weight: 600;
+                                vertical-alignment: center;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 2. 4 列 KPI 状态网格
+        HorizontalLayout {
+            spacing: 10px;
+            height: 72px;
+
+            KpiCard {
+                title: "主机实例状态";
+                sub_left: "常驻在线";
+                value: "在线常驻";
+                sub_right: "本地服务 Port: " + root.host_port;
+                val_color: #34d399;
+            }
+
+            KpiCard {
+                title: "分身脱机运行";
+                sub_left: root.sub_running ? "PID: " + root.sub_pid : "已停止";
+                value: root.sub_running ? "完全脱离" : "未启动";
+                sub_right: root.sub_running ? "本地服务 Port: " + root.sub_port : "按 Space 启动";
+                val_color: root.sub_running ? #38bdf8 : #64748b;
+            }
+
+            KpiCard {
+                title: "双实例总内存";
+                sub_left: "物理占用 (RSS)";
+                value: root.total_ram;
+                sub_right: "Host: " + Math.round(root.host_ram) + "M | Sub: " + Math.round(root.sub_ram) + "M";
+                val_color: #f1f5f9;
+            }
+
+            KpiCard {
+                title: "隔离安全级别";
+                sub_left: "无串号风险";
+                value: "物理级完全沙箱";
+                sub_right: "FileToken 凭据旁路";
+                val_color: #c084fc;
+            }
+        }
+
+        // 3. 中间双实例监控面板 (Host vs Sub)
+        HorizontalLayout {
+            spacing: 10px;
+            height: 190px;
+
+            // Host 卡片
+            Rectangle {
+                background: #0e121b;
+                border-color: #1e293b;
+                border-width: 1px;
+                border-radius: 8px;
+                horizontal-stretch: 1;
+
+                VerticalLayout {
+                    padding: 12px;
+                    spacing: 10px;
+
+                    HorizontalLayout {
+                        alignment: space-between;
+                        HorizontalLayout {
+                            spacing: 6px;
+                            Rectangle { width: 8px; height: 8px; border-radius: 4px; background: #34d399; y: (parent.height - 8px) / 2; }
+                            Text { text: "主机主实例 · 主账号"; color: #f1f5f9; font-size: 13px; font-weight: 700; }
+                        }
+                        StatusPill { text: "宿主主会话"; pill_color: #34d399; show_dot: false; height: 20px; }
+                    }
+
+                    // 参数列表
+                    VerticalLayout {
+                        spacing: 6px;
+
+                        HorizontalLayout {
+                            Text { text: "语言服务端口:"; color: #94a3b8; font-size: 11px; width: 90px; }
+                            Text { text: root.host_port; color: #818cf8; font-size: 11px; font-weight: 600; }
+                        }
+                        HorizontalLayout {
+                            Text { text: "账号授权状态:"; color: #94a3b8; font-size: 11px; width: 90px; }
+                            Text { text: "主号 (Windows 凭据保护)"; color: #34d399; font-size: 11px; }
+                        }
+                        HorizontalLayout {
+                            Text { text: "CPU 负载:"; color: #94a3b8; font-size: 11px; width: 90px; }
+                            Rectangle {
+                                background: #1e293b;
+                                border-radius: 3px;
+                                height: 8px;
+                                horizontal-stretch: 1;
+                                y: (parent.height - 8px) / 2;
+                                Rectangle {
+                                    x: 0;
+                                    width: parent.width * Math.min(1.0, root.host_cpu / 100.0);
+                                    height: 8px;
+                                    border-radius: 3px;
+                                    background: #38bdf8;
+                                }
+                            }
+                            Text { text: Math.round(root.host_cpu) + "%"; color: #cbd5e1; font-size: 11px; width: 40px; horizontal-alignment: right; }
+                        }
+                        HorizontalLayout {
+                            Text { text: "物理内存占用:"; color: #94a3b8; font-size: 11px; width: 90px; }
+                            Rectangle {
+                                background: #1e293b;
+                                border-radius: 3px;
+                                height: 8px;
+                                horizontal-stretch: 1;
+                                y: (parent.height - 8px) / 2;
+                                Rectangle {
+                                    x: 0;
+                                    width: parent.width * Math.min(1.0, root.host_ram / 1024.0);
+                                    height: 8px;
+                                    border-radius: 3px;
+                                    background: #34d399;
+                                }
+                            }
+                            Text { text: Math.round(root.host_ram) + " MB"; color: #cbd5e1; font-size: 11px; width: 55px; horizontal-alignment: right; }
+                        }
+                    }
+                }
+            }
+
+            // Sub 卡片
+            Rectangle {
+                background: #0e121b;
+                border-color: root.sub_running ? #0284c7 : #1e293b;
+                border-width: 1px;
+                border-radius: 8px;
+                horizontal-stretch: 1;
+
+                VerticalLayout {
+                    padding: 12px;
+                    spacing: 10px;
+
+                    HorizontalLayout {
+                        alignment: space-between;
+                        HorizontalLayout {
+                            spacing: 6px;
+                            Rectangle {
+                                width: 8px;
+                                height: 8px;
+                                border-radius: 4px;
+                                background: root.sub_running ? #38bdf8 : #64748b;
+                                y: (parent.height - 8px) / 2;
+                            }
+                            Text { text: "独立分身 · 第二账号"; color: #f1f5f9; font-size: 13px; font-weight: 700; }
+                        }
+                        StatusPill {
+                            text: root.sub_running ? "Win32 脱机常驻" : "已终止";
+                            pill_color: root.sub_running ? #38bdf8 : #64748b;
+                            show_dot: false;
+                            height: 20px;
+                        }
+                    }
+
+                    // 参数列表
+                    VerticalLayout {
+                        spacing: 6px;
+
+                        HorizontalLayout {
+                            Text { text: "语言服务端口:"; color: #94a3b8; font-size: 11px; width: 90px; }
+                            Text { text: root.sub_port; color: #818cf8; font-size: 11px; font-weight: 600; }
+                        }
+                        HorizontalLayout {
+                            Text { text: "账号授权状态:"; color: #94a3b8; font-size: 11px; width: 90px; }
+                            Text { text: "第二账号 (完全隔离沙箱)"; color: #fbbf24; font-size: 11px; }
+                        }
+                        HorizontalLayout {
+                            Text { text: "CPU 负载:"; color: #94a3b8; font-size: 11px; width: 90px; }
+                            Rectangle {
+                                background: #1e293b;
+                                border-radius: 3px;
+                                height: 8px;
+                                horizontal-stretch: 1;
+                                y: (parent.height - 8px) / 2;
+                                Rectangle {
+                                    x: 0;
+                                    width: parent.width * Math.min(1.0, root.sub_cpu / 100.0);
+                                    height: 8px;
+                                    border-radius: 3px;
+                                    background: #38bdf8;
+                                }
+                            }
+                            Text { text: Math.round(root.sub_cpu) + "%"; color: #cbd5e1; font-size: 11px; width: 40px; horizontal-alignment: right; }
+                        }
+                        HorizontalLayout {
+                            Text { text: "物理内存占用:"; color: #94a3b8; font-size: 11px; width: 90px; }
+                            Rectangle {
+                                background: #1e293b;
+                                border-radius: 3px;
+                                height: 8px;
+                                horizontal-stretch: 1;
+                                y: (parent.height - 8px) / 2;
+                                Rectangle {
+                                    x: 0;
+                                    width: parent.width * Math.min(1.0, root.sub_ram / 1024.0);
+                                    height: 8px;
+                                    border-radius: 3px;
+                                    background: #34d399;
+                                }
+                            }
+                            Text { text: Math.round(root.sub_ram) + " MB"; color: #cbd5e1; font-size: 11px; width: 55px; horizontal-alignment: right; }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 4. 下半部分：沙箱目录矩阵 + 诊断终端日志流
+        HorizontalLayout {
+            spacing: 10px;
+            vertical-stretch: 1;
+
+            // 左侧：沙箱隔离环境检视器
+            Rectangle {
+                background: #0e121b;
+                border-color: #1e293b;
+                border-width: 1px;
+                border-radius: 8px;
+                horizontal-stretch: 1;
+
+                VerticalLayout {
+                    padding: 12px;
+                    spacing: 8px;
+
+                    HorizontalLayout {
+                        alignment: space-between;
+                        Text { text: "📁 沙箱隔离环境检视器"; color: #f1f5f9; font-size: 12px; font-weight: 700; }
+                        Text { text: "data/instance_2"; color: #64748b; font-size: 10px; }
+                    }
+
+                    // 4 项环境路径
+                    VerticalLayout {
+                        spacing: 6px;
+
+                        Rectangle {
+                            background: #07090e;
+                            border-color: #1e293b;
+                            border-width: 1px;
+                            border-radius: 5px;
+                            height: 28px;
+                            HorizontalLayout {
+                                padding-left: 8px; padding-right: 8px;
+                                alignment: space-between;
+                                Text { text: "USERPROFILE"; color: #cbd5e1; font-size: 11px; font-weight: 600; vertical-alignment: center; }
+                                Text { text: "...\\data\\instance_2\\home (已隔离)"; color: #34d399; font-size: 10px; vertical-alignment: center; }
+                            }
+                        }
+
+                        Rectangle {
+                            background: #07090e;
+                            border-color: #1e293b;
+                            border-width: 1px;
+                            border-radius: 5px;
+                            height: 28px;
+                            HorizontalLayout {
+                                padding-left: 8px; padding-right: 8px;
+                                alignment: space-between;
+                                Text { text: "APPDATA (Roaming)"; color: #cbd5e1; font-size: 11px; font-weight: 600; vertical-alignment: center; }
+                                Text { text: "...\\data\\instance_2\\AppData (已隔离)"; color: #34d399; font-size: 10px; vertical-alignment: center; }
+                            }
+                        }
+
+                        Rectangle {
+                            background: #07090e;
+                            border-color: #1e293b;
+                            border-width: 1px;
+                            border-radius: 5px;
+                            height: 28px;
+                            HorizontalLayout {
+                                padding-left: 8px; padding-right: 8px;
+                                alignment: space-between;
+                                Text { text: "LOCALAPPDATA"; color: #cbd5e1; font-size: 11px; font-weight: 600; vertical-alignment: center; }
+                                Text { text: "原生继承 (免登录 Chrome)"; color: #38bdf8; font-size: 10px; vertical-alignment: center; }
+                            }
+                        }
+
+                        Rectangle {
+                            background: #07090e;
+                            border-color: #1e293b;
+                            border-width: 1px;
+                            border-radius: 5px;
+                            height: 28px;
+                            HorizontalLayout {
+                                padding-left: 8px; padding-right: 8px;
+                                alignment: space-between;
+                                Text { text: "SSH_CONNECTION"; color: #cbd5e1; font-size: 11px; font-weight: 600; vertical-alignment: center; }
+                                Text { text: "独立 Token 旁路已激活"; color: #c084fc; font-size: 10px; vertical-alignment: center; }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 右侧：实时诊断控制台
+            Rectangle {
+                background: #05070c;
+                border-color: #1e293b;
+                border-width: 1px;
+                border-radius: 8px;
+                horizontal-stretch: 1;
+
+                VerticalLayout {
+                    padding: 10px;
+                    spacing: 6px;
+
+                    HorizontalLayout {
+                        alignment: space-between;
+                        Text { text: "📟 内核遥测诊断终端"; color: #94a3b8; font-size: 11px; font-weight: 600; }
+                        Text { text: "Slint Live Stream"; color: #38bdf8; font-size: 10px; }
+                    }
+
+                    Rectangle {
+                        background: #07090e;
+                        border-color: #1e293b;
+                        border-width: 1px;
+                        border-radius: 5px;
+                        vertical-stretch: 1;
+
+                        ScrollView {
+                            Text {
+                                text: root.log_content;
+                                color: #cbd5e1;
+                                font-size: 11px;
+                                wrap: word-wrap;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 5. 底部动作工具栏 (Action Bar + Toast)
+        VerticalLayout {
+            spacing: 8px;
+
+            HorizontalLayout {
+                spacing: 8px;
+
+                KeyButton {
+                    key_label: "Space";
+                    action_label: "启动/调出分身";
+                    accent_color: #38bdf8;
+                    clicked => { root.action_space(); }
+                }
+
+                KeyButton {
+                    key_label: "K";
+                    action_label: "停止分身";
+                    accent_color: #fb7185;
+                    clicked => { root.action_kill(); }
+                }
+
+                KeyButton {
+                    key_label: "R";
+                    action_label: "重启服务";
+                    accent_color: #fbbf24;
+                    clicked => { root.action_restart(); }
+                }
+
+                KeyButton {
+                    key_label: "C";
+                    action_label: "换号清空凭证";
+                    accent_color: #fb7185;
+                    clicked => { root.action_clear(); }
+                }
+
+                KeyButton {
+                    key_label: "O";
+                    action_label: "打开沙箱目录";
+                    accent_color: #818cf8;
+                    clicked => { root.action_open(); }
+                }
+
+                Rectangle { horizontal-stretch: 1; }
+
+                KeyButton {
+                    key_label: "Q";
+                    action_label: "彻底退出座舱";
+                    accent_color: #fb7185;
+                    clicked => { root.action_quit(); }
+                }
+            }
+
+            // 状态提示条
+            Rectangle {
+                background: #0e121b;
+                border-color: #1e293b;
+                border-width: 1px;
+                border-radius: 6px;
+                height: 28px;
+
+                HorizontalLayout {
+                    padding-left: 10px;
+                    padding-right: 10px;
+                    alignment: space-between;
+
+                    HorizontalLayout {
+                        spacing: 6px;
+                        Text { text: "◆"; color: #38bdf8; font-size: 11px; vertical-alignment: center; }
+                        Text { text: root.toast_message; color: #94a3b8; font-size: 11px; vertical-alignment: center; }
+                    }
+
+                    Text { text: "纯原生 GPU 矢量渲染"; color: #64748b; font-size: 10px; vertical-alignment: center; }
+                }
+            }
+        }
+    }
+}

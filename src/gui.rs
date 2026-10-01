@@ -1,30 +1,20 @@
 use crate::launcher::LauncherConfig;
+use crate::monitor::TelemetryMonitor;
 use anyhow::Result;
+use slint::{CloseRequestResponse, ComponentHandle, Timer, TimerMode};
 use std::sync::{Arc, Mutex};
-use tao::{
-    dpi::LogicalSize,
-    event::{Event, StartCause, WindowEvent},
-    event_loop::{ControlFlow, EventLoopBuilder},
-    window::WindowBuilder,
-};
-use wry::WebViewBuilder;
 
-const HTML_CONTENT: &str = include_str!("../tui_prototype.html");
-const ICON_RGBA: &[u8] = include_bytes!("../assets/icon_32.rgba");
-
-enum UserEvent {
-    Tray(tray_icon::TrayIconEvent),
-    Menu(tray_icon::menu::MenuEvent),
-}
+slint::include_modules!();
 
 pub fn run_gui() -> Result<()> {
     let config = Arc::new(Mutex::new(LauncherConfig::new()?));
     let sub_pid = Arc::new(Mutex::new(None::<u32>));
+    let monitor = Arc::new(Mutex::new(TelemetryMonitor::new()));
 
-    let event_loop = EventLoopBuilder::<UserEvent>::with_user_event().build();
-    let proxy = event_loop.create_proxy();
+    let main_window = MainWindow::new()?;
 
-    // 1. 构建系统托盘图标与上下文右键菜单
+    // 1. 系统托盘与右键菜单构建
+    const ICON_RGBA: &[u8] = include_bytes!("../assets/icon_32.rgba");
     let tray_menu = tray_icon::menu::Menu::new();
     let item_show = tray_icon::menu::MenuItem::new("显示座舱 (Show Cockpit)", true, None);
     let item_sub = tray_icon::menu::MenuItem::new("启动/调出分身 (Launch Sub-instance)", true, None);
@@ -36,141 +26,241 @@ pub fn run_gui() -> Result<()> {
     let quit_id = item_quit.id().clone();
 
     tray_menu.append_items(&[&item_show, &item_sub, &sep, &item_quit])?;
-
     let tray_icon_img = tray_icon::Icon::from_rgba(ICON_RGBA.to_vec(), 32, 32)?;
     let _tray = tray_icon::TrayIconBuilder::new()
         .with_menu(Box::new(tray_menu))
-        .with_tooltip("Antigravity 开发者座舱 · Studio Cockpit")
+        .with_tooltip("Antigravity 开发者座舱 · Studio Cockpit (Slint Native)")
         .with_icon(tray_icon_img)
         .build()?;
 
-    // 2. 挂载托盘事件监听与转发代理
-    let proxy_tray = proxy.clone();
-    tray_icon::TrayIconEvent::set_event_handler(Some(move |event| {
-        let _ = proxy_tray.send_event(UserEvent::Tray(event));
-    }));
-
-    let proxy_menu = proxy.clone();
-    tray_icon::menu::MenuEvent::set_event_handler(Some(move |event| {
-        let _ = proxy_menu.send_event(UserEvent::Menu(event));
-    }));
-
-    // 3. 构建原生窗口（设置自定义图标）
-    let win_icon = tao::window::Icon::from_rgba(ICON_RGBA.to_vec(), 32, 32).ok();
-    let mut win_builder = WindowBuilder::new()
-        .with_title("Antigravity 开发者座舱 · Studio Cockpit")
-        .with_inner_size(LogicalSize::new(1220.0, 820.0))
-        .with_min_inner_size(LogicalSize::new(960.0, 680.0));
-
-    if let Some(icon) = win_icon {
-        win_builder = win_builder.with_window_icon(Some(icon));
-    }
-
-    let window = win_builder.build(&event_loop)?;
-
-    // 4. 构建 WebView2 视图与双向 IPC
-    let config_clone = Arc::clone(&config);
-    let sub_pid_clone = Arc::clone(&sub_pid);
-
-    let _webview = WebViewBuilder::new()
-        .with_html(HTML_CONTENT)
-        .with_ipc_handler(move |req| {
-            let cmd = req.body().trim().to_lowercase();
-            let conf = config_clone.lock().unwrap();
-            let mut pid_lock = sub_pid_clone.lock().unwrap();
-
-            match cmd.as_str() {
-                "space" => {
-                    if let Some(pid) = *pid_lock {
-                        conf.bring_to_front(pid);
-                    } else if let Ok(new_pid) = conf.spawn_detached() {
-                        *pid_lock = Some(new_pid);
-                    }
-                }
-                "k" => {
-                    if let Some(pid) = *pid_lock {
-                        let _ = conf.kill_sub_instance_by_pid(pid);
-                        *pid_lock = None;
-                    }
-                }
-                "c" => {
-                    let _ = conf.clear_token();
-                }
-                "o" => {
-                    let _ = conf.open_sandbox_in_explorer();
-                }
-                "q" => {
-                    std::process::exit(0);
-                }
-                _ => {}
-            }
-        })
-        .build(&window)?;
-
-    // 5. 事件循环与托盘最小化调度
+    // 2. 托盘事件监听与跨线程派发
+    let ui_weak_tray = main_window.as_weak();
     let config_tray = Arc::clone(&config);
     let sub_pid_tray = Arc::clone(&sub_pid);
 
-    let restore_window = |win: &tao::window::Window| {
-        win.set_visible(true);
-        win.set_minimized(false);
-        win.set_focus();
-        #[cfg(target_os = "windows")]
-        {
-            use tao::platform::windows::WindowExtWindows;
-            use windows_sys::Win32::UI::WindowsAndMessaging::SetForegroundWindow;
-            unsafe {
-                SetForegroundWindow(win.hwnd() as _);
+    tray_icon::TrayIconEvent::set_event_handler(Some({
+        let ui_weak = ui_weak_tray.clone();
+        move |event| {
+            if let tray_icon::TrayIconEvent::Click {
+                button: tray_icon::MouseButton::Left,
+                button_state: tray_icon::MouseButtonState::Up,
+                ..
+            }
+            | tray_icon::TrayIconEvent::DoubleClick {
+                button: tray_icon::MouseButton::Left,
+                ..
+            } = event
+            {
+                let ui_weak = ui_weak.clone();
+                let _ = slint::invoke_from_event_loop(move || {
+                    if let Some(ui) = ui_weak.upgrade() {
+                        let _ = ui.show();
+                    }
+                });
             }
         }
-    };
+    }));
 
-    event_loop.run(move |event, _, control_flow| {
-        *control_flow = ControlFlow::Wait;
-
-        // 保持托盘实例和 webview 生命周期存活
-        let _ = &_tray;
-        let _ = &_webview;
-
-        match event {
-            Event::NewEvents(StartCause::Init) => {}
-            Event::WindowEvent {
-                event: WindowEvent::CloseRequested,
-                ..
-            } => {
-                // 点击右上角 [X] 关闭按钮时，缩小/隐藏至系统托盘，不退出应用
-                window.set_visible(false);
-            }
-            Event::UserEvent(UserEvent::Tray(
-                tray_icon::TrayIconEvent::Click {
-                    button: tray_icon::MouseButton::Left,
-                    button_state: tray_icon::MouseButtonState::Up,
-                    ..
-                }
-                | tray_icon::TrayIconEvent::DoubleClick {
-                    button: tray_icon::MouseButton::Left,
-                    ..
-                },
-            )) => {
-                restore_window(&window);
-            }
-            Event::UserEvent(UserEvent::Tray(_)) => {}
-            Event::UserEvent(UserEvent::Menu(menu_event)) => {
-                if menu_event.id == show_id {
-                    restore_window(&window);
-                } else if menu_event.id == sub_id {
-                    let conf = config_tray.lock().unwrap();
-                    let mut pid_lock = sub_pid_tray.lock().unwrap();
-                    if let Some(pid) = *pid_lock {
-                        conf.bring_to_front(pid);
-                    } else if let Ok(new_pid) = conf.spawn_detached() {
-                        *pid_lock = Some(new_pid);
+    tray_icon::menu::MenuEvent::set_event_handler(Some({
+        let ui_weak = ui_weak_tray.clone();
+        let conf = config_tray;
+        let pid_lock = sub_pid_tray;
+        move |event: tray_icon::menu::MenuEvent| {
+            if event.id == show_id {
+                let ui_weak = ui_weak.clone();
+                let _ = slint::invoke_from_event_loop(move || {
+                    if let Some(ui) = ui_weak.upgrade() {
+                        let _ = ui.show();
                     }
-                } else if menu_event.id == quit_id {
-                    *control_flow = ControlFlow::Exit;
-                }
+                });
+            } else if event.id == sub_id {
+                let conf = conf.clone();
+                let pid_lock = pid_lock.clone();
+                let _ = slint::invoke_from_event_loop(move || {
+                    let c = conf.lock().unwrap();
+                    let mut p = pid_lock.lock().unwrap();
+                    if let Some(pid) = *p {
+                        c.bring_to_front(pid);
+                    } else if let Ok(new_pid) = c.spawn_detached() {
+                        *p = Some(new_pid);
+                    }
+                });
+            } else if event.id == quit_id {
+                std::process::exit(0);
             }
-            _ => (),
+        }
+    }));
+
+    // 3. 点击右上角 [X] 缩小至系统托盘，不退出应用
+    main_window.window().on_close_requested({
+        let ui_weak = main_window.as_weak();
+        move || {
+            if let Some(ui) = ui_weak.upgrade() {
+                let _ = ui.hide();
+            }
+            CloseRequestResponse::KeepWindowShown
         }
     });
+
+    // 4. 绑定 UI 回调与按键动作
+    let append_log = |ui: &MainWindow, tag: &str, msg: &str| {
+        let old = ui.get_log_content();
+        let time = chrono::Local::now().format("%H:%M:%S").to_string();
+        let new_line = format!("[{}] [{}] {}\n", time, tag, msg);
+        ui.set_log_content(format!("{}{}", old, new_line).into());
+    };
+
+    // Space
+    main_window.on_action_space({
+        let ui_weak = main_window.as_weak();
+        let conf = Arc::clone(&config);
+        let pid_lock = Arc::clone(&sub_pid);
+        move || {
+            if let Some(ui) = ui_weak.upgrade() {
+                let c = conf.lock().unwrap();
+                let mut p = pid_lock.lock().unwrap();
+                if let Some(pid) = *p {
+                    c.bring_to_front(pid);
+                    ui.set_toast_message(format!("分身正在运行 (PID: {})，已前置置顶窗口。", pid).into());
+                    append_log(&ui, "WIN32", &format!("前置分身窗口 (PID: {})", pid));
+                } else {
+                    match c.spawn_detached() {
+                        Ok(new_pid) => {
+                            *p = Some(new_pid);
+                            ui.set_sub_running(true);
+                            ui.set_sub_pid(new_pid.to_string().into());
+                            ui.set_toast_message(format!("分身已脱机启动 (PID: {})。", new_pid).into());
+                            append_log(&ui, "SPAWN", &format!("分身已独立派生 (PID: {})", new_pid));
+                        }
+                        Err(e) => {
+                            ui.set_toast_message(format!("分身启动失败: {}", e).into());
+                            append_log(&ui, "ERROR", &format!("分身启动失败: {}", e));
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+    // K
+    main_window.on_action_kill({
+        let ui_weak = main_window.as_weak();
+        let conf = Arc::clone(&config);
+        let pid_lock = Arc::clone(&sub_pid);
+        move || {
+            if let Some(ui) = ui_weak.upgrade() {
+                let c = conf.lock().unwrap();
+                let mut p = pid_lock.lock().unwrap();
+                if let Some(pid) = *p {
+                    let _ = c.kill_sub_instance_by_pid(pid);
+                    *p = None;
+                    ui.set_sub_running(false);
+                    ui.set_sub_pid("--".into());
+                    ui.set_sub_port("--".into());
+                    ui.set_toast_message(format!("分身进程 (PID: {}) 已终止。", pid).into());
+                    append_log(&ui, "KILL", &format!("分身进程 (PID: {}) 已终止", pid));
+                } else {
+                    ui.set_toast_message("分身未在运行。".into());
+                }
+            }
+        }
+    });
+
+    // R
+    main_window.on_action_restart({
+        let ui_weak = main_window.as_weak();
+        move || {
+            if let Some(ui) = ui_weak.upgrade() {
+                ui.set_toast_message("已重置刷新实例遥测探测器。".into());
+                append_log(&ui, "RESTART", "已重置刷新实例遥测探测器");
+            }
+        }
+    });
+
+    // C
+    main_window.on_action_clear({
+        let ui_weak = main_window.as_weak();
+        let conf = Arc::clone(&config);
+        move || {
+            if let Some(ui) = ui_weak.upgrade() {
+                let c = conf.lock().unwrap();
+                match c.clear_token() {
+                    Ok(true) => {
+                        ui.set_toast_message("独立凭据文件已擦除，下次打开将重新弹出 Google 登录授权。".into());
+                        append_log(&ui, "AUTH", "独立 Token 凭据已清空 (待重新授权)");
+                    }
+                    Ok(false) => {
+                        ui.set_toast_message("未发现独立凭据文件 (已处于未授权状态)。".into());
+                    }
+                    Err(e) => {
+                        ui.set_toast_message(format!("清空凭据失败: {}", e).into());
+                    }
+                }
+            }
+        }
+    });
+
+    // O
+    main_window.on_action_open({
+        let ui_weak = main_window.as_weak();
+        let conf = Arc::clone(&config);
+        move || {
+            if let Some(ui) = ui_weak.upgrade() {
+                let c = conf.lock().unwrap();
+                let _ = c.open_sandbox_in_explorer();
+                ui.set_toast_message("已在 Windows 资源管理器中打开沙箱目录。".into());
+                append_log(&ui, "EXPLORER", "弹出沙箱目录 data/instance_2");
+            }
+        }
+    });
+
+    // Q
+    main_window.on_action_quit({
+        move || {
+            std::process::exit(0);
+        }
+    });
+
+    // 5. 1秒高精度实时指标刷新定时器
+    let timer = Timer::default();
+    let ui_weak_mon = main_window.as_weak();
+    let monitor_timer = Arc::clone(&monitor);
+    let sub_pid_mon = Arc::clone(&sub_pid);
+
+    timer.start(TimerMode::Repeated, std::time::Duration::from_millis(1000), move || {
+        if let Some(ui) = ui_weak_mon.upgrade() {
+            let mut mon = monitor_timer.lock().unwrap();
+            let known_sub = *sub_pid_mon.lock().unwrap();
+            mon.refresh(known_sub);
+
+            // 更新 Host 指标
+            ui.set_host_cpu(mon.host.cpu_usage);
+            ui.set_host_ram(mon.host.memory_rss_mb as f32);
+            if let Some(port) = mon.host.ls_port {
+                ui.set_host_port(port.to_string().into());
+            }
+
+            // 更新 Sub 指标
+            ui.set_sub_running(mon.sub.is_running);
+            if let Some(pid) = mon.sub.electron_pid {
+                ui.set_sub_pid(pid.to_string().into());
+            } else {
+                ui.set_sub_pid("--".into());
+            }
+            if let Some(port) = mon.sub.ls_port {
+                ui.set_sub_port(port.to_string().into());
+            } else {
+                ui.set_sub_port("--".into());
+            }
+            ui.set_sub_cpu(mon.sub.cpu_usage);
+            ui.set_sub_ram(mon.sub.memory_rss_mb as f32);
+
+            // 更新聚合总内存与时钟
+            ui.set_total_ram(format!("{:.1} MB", mon.total_memory_mb).into());
+            ui.set_current_time(chrono::Local::now().format("%H:%M:%S").to_string().into());
+        }
+    });
+
+    main_window.run()?;
+    Ok(())
 }
