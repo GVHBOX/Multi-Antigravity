@@ -29,6 +29,7 @@ pub fn run_gui() -> Result<()> {
     let tray_icon_img = tray_icon::Icon::from_rgba(ICON_RGBA.to_vec(), 32, 32)?;
     let _tray = tray_icon::TrayIconBuilder::new()
         .with_menu(Box::new(tray_menu))
+        .with_menu_on_left_click(false)
         .with_tooltip("Antigravity 开发者座舱 · Studio Cockpit (Slint Native)")
         .with_icon(tray_icon_img)
         .build()?;
@@ -36,8 +37,10 @@ pub fn run_gui() -> Result<()> {
     // 2. 托盘事件监听与跨线程派发
     let config_tray = Arc::clone(&config);
     let sub_pid_tray = Arc::clone(&sub_pid);
+    let ui_weak_tray = main_window.as_weak();
 
     tray_icon::TrayIconEvent::set_event_handler(Some({
+        let ui_weak = ui_weak_tray.clone();
         move |event| {
             if let tray_icon::TrayIconEvent::Click {
                 button: tray_icon::MouseButton::Left,
@@ -50,7 +53,7 @@ pub fn run_gui() -> Result<()> {
             } = event
             {
                 #[cfg(target_os = "windows")]
-                show_cockpit_from_tray();
+                show_cockpit_from_tray(&ui_weak);
             }
         }
     }));
@@ -58,10 +61,11 @@ pub fn run_gui() -> Result<()> {
     tray_icon::menu::MenuEvent::set_event_handler(Some({
         let conf = config_tray;
         let pid_lock = sub_pid_tray;
+        let ui_weak = ui_weak_tray.clone();
         move |event: tray_icon::menu::MenuEvent| {
             if event.id == show_id {
                 #[cfg(target_os = "windows")]
-                show_cockpit_from_tray();
+                show_cockpit_from_tray(&ui_weak);
             } else if event.id == sub_id {
                 let conf = conf.clone();
                 let pid_lock = pid_lock.clone();
@@ -79,6 +83,22 @@ pub fn run_gui() -> Result<()> {
             }
         }
     }));
+
+#[cfg(target_os = "windows")]
+fn ensure_dark_background(hwnd: windows_sys::Win32::Foundation::HWND) {
+    use windows_sys::Win32::Graphics::Gdi::CreateSolidBrush;
+    use windows_sys::Win32::UI::WindowsAndMessaging::{SetClassLongPtrW, GCLP_HBRBACKGROUND};
+
+    if !hwnd.is_null() {
+        unsafe {
+            // 0x000E0907 -> BGR 对应 #07090e，从底层将窗口类画刷设为极客深黑，根治任何白色擦除闪烁
+            let dark_brush = CreateSolidBrush(0x000E0907);
+            if !dark_brush.is_null() {
+                SetClassLongPtrW(hwnd, GCLP_HBRBACKGROUND, dark_brush as isize);
+            }
+        }
+    }
+}
 
 #[cfg(target_os = "windows")]
 fn trim_working_set() {
@@ -131,18 +151,61 @@ fn hide_cockpit_to_tray() {
 }
 
 #[cfg(target_os = "windows")]
-fn show_cockpit_from_tray() {
+fn show_cockpit_from_tray(ui_weak: &slint::Weak<MainWindow>) {
+    use windows_sys::Win32::Graphics::Gdi::InvalidateRect;
     use windows_sys::Win32::UI::WindowsAndMessaging::{
-        SetForegroundWindow, ShowWindow, SW_RESTORE, SW_SHOW,
+        GetWindowRect, SetForegroundWindow, SetWindowPos, ShowWindow, SWP_NOACTIVATE,
+        SWP_NOMOVE, SWP_NOZORDER, SW_RESTORE, SW_SHOW,
     };
+
     let hwnd = get_cockpit_hwnd();
     if !hwnd.is_null() {
+        ensure_dark_background(hwnd);
         unsafe {
             ShowWindow(hwnd, SW_SHOW);
             ShowWindow(hwnd, SW_RESTORE);
             SetForegroundWindow(hwnd);
+
+            // 尺寸微调 1 像素强制触发布局与软渲染 Surface 全量重绘
+            let mut rect = windows_sys::Win32::Foundation::RECT {
+                left: 0,
+                top: 0,
+                right: 0,
+                bottom: 0,
+            };
+            GetWindowRect(hwnd, &mut rect);
+            let w = rect.right - rect.left;
+            let h = rect.bottom - rect.top;
+            if w > 0 && h > 0 {
+                SetWindowPos(
+                    hwnd,
+                    std::ptr::null_mut(),
+                    0,
+                    0,
+                    w + 1,
+                    h,
+                    SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE,
+                );
+                SetWindowPos(
+                    hwnd,
+                    std::ptr::null_mut(),
+                    0,
+                    0,
+                    w,
+                    h,
+                    SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE,
+                );
+            }
+            InvalidateRect(hwnd, std::ptr::null(), 0);
         }
     }
+
+    let ui_weak_clone = ui_weak.clone();
+    let _ = slint::invoke_from_event_loop(move || {
+        if let Some(ui) = ui_weak_clone.upgrade() {
+            ui.window().request_redraw();
+        }
+    });
 }
 
     // 3. 点击右上角 [X] 缩小至系统托盘，不退出应用并修剪工作集
@@ -321,6 +384,11 @@ fn show_cockpit_from_tray() {
     });
 
     main_window.show()?;
+    #[cfg(target_os = "windows")]
+    {
+        let hwnd = get_cockpit_hwnd();
+        ensure_dark_background(hwnd);
+    }
     let _ = slint::run_event_loop();
     Ok(())
 }
