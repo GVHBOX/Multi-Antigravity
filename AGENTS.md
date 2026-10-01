@@ -102,9 +102,19 @@ python tools/check_front_hygiene.py         # 铁律 2
 - 项目目前**没有单元测试**。验收靠两步：`cargo check` 零警告 + **干净克隆能编**
   （在空目录 `git clone` 本仓后 `cargo build --release`，能过才算没把构建必需的文件漏在仓库外 ——
   `assets/icon.png` 就曾经漏过一次）。
-- 改动涉及窗口 / 托盘 / 渲染时，**必须起真 exe 验一遍**，别只靠编译。
-  座舱常被用户开着，根目录 `antigravity-cockpit.exe` 会占用导致覆盖失败
-  （`Device or resource busy`），此时新产物先留在 `target/release/`，等关掉再覆盖。
+- 改动涉及窗口 / 托盘 / 渲染时，**必须起真 exe 验一遍**，别只靠编译。用 `tools/ui_probe.py`：
+
+```bash
+python tools/ui_probe.py launch            # 起临时实例，输出 PID
+python tools/ui_probe.py rect <pid>        # 读真实像素尺寸 + DPI + 逻辑尺寸
+python tools/ui_probe.py shot <pid>        # 截窗口内容到 .scratch/（被别的窗口挡着也能截）
+python tools/ui_probe.py key <pid> 52 20   # 发按键（52 = R，分身没跑时只写日志，适合刷日志量）
+python tools/ui_probe.py kill <pid>
+```
+
+  `shot` 走 PrintWindow，比抓屏可靠；`key` 走 PostMessage，不会打扰前台程序。
+- 座舱常被用户开着，根目录 `antigravity-cockpit.exe` 会占用导致覆盖失败
+  （`Device or resource busy`），此时新产物先留在 `target/release/`，等用户关掉再覆盖。
 
 ## 环境事实
 
