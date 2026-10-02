@@ -327,8 +327,6 @@ fn show_cockpit_from_tray(ui_weak: &slint::Weak<MainWindow>) {
                     windows_sys::Win32::UI::WindowsAndMessaging::IsIconic(hwnd) != 0
                 };
                 if was_iconic && !is_iconic {
-                    let _ = ui.window().hide();
-                    let _ = ui.window().show();
                     ui.window().request_redraw();
                 }
                 was_iconic = is_iconic;
