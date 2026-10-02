@@ -233,7 +233,7 @@ export component MainWindow inherits Window {
                 padding-left: 22px;
                 padding-right: 22px;
                 spacing: 16px;
-                alignment: space-between;
+                alignment: start;
 
                 HorizontalLayout {
                     spacing: 10px;
@@ -272,42 +272,6 @@ export component MainWindow inherits Window {
                     }
                 }
 
-                HorizontalLayout {
-                    spacing: 8px;
-                    alignment: end;
-
-                    StatusPill {
-                        text: root.kernel_status;
-                        pill_color: #34d399;
-                        show_dot: true;
-                    }
-
-                    StatusPill {
-                        text: root.ram_overhead;
-                        pill_color: #38bdf8;
-                        show_dot: false;
-                    }
-
-                    Rectangle {
-                        background: rgba(56, 189, 248, 0.08);
-                        border-color: rgba(56, 189, 248, 0.22);
-                        border-width: 1px;
-                        border-radius: 8px;
-                        height: 34px;
-                        HorizontalLayout {
-                            padding-left: 14px;
-                            padding-right: 14px;
-                            alignment: center;
-                            Text {
-                                text: root.current_time;
-                                color: #38bdf8;
-                                font-size: 20px;
-                                font-weight: 700;
-                                vertical-alignment: center;
-                            }
-                        }
-                    }
-                }
             }
         }
 
@@ -724,6 +688,45 @@ export component MainWindow inherits Window {
                     }
 
                     Text { text: "纯原生矢量渲染"; color: #64748b; font-size: 12px; vertical-alignment: center; }
+                }
+            }
+        }
+    }
+
+    HorizontalLayout {
+        x: parent.width - self.width - 50px;
+        y: 39px;
+        spacing: 8px;
+        alignment: end;
+
+        StatusPill {
+            text: root.kernel_status;
+            pill_color: #34d399;
+            show_dot: true;
+        }
+
+        StatusPill {
+            text: root.ram_overhead;
+            pill_color: #38bdf8;
+            show_dot: false;
+        }
+
+        Rectangle {
+            background: rgba(56, 189, 248, 0.08);
+            border-color: rgba(56, 189, 248, 0.22);
+            border-width: 1px;
+            border-radius: 8px;
+            height: 34px;
+            HorizontalLayout {
+                padding-left: 14px;
+                padding-right: 14px;
+                alignment: center;
+                Text {
+                    text: root.current_time;
+                    color: #38bdf8;
+                    font-size: 20px;
+                    font-weight: 700;
+                    vertical-alignment: center;
                 }
             }
         }
