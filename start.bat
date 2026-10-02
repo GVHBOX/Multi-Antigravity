@@ -1,4 +1,4 @@
 @echo off
 cd /d "%~dp0"
-start "" "%~dp0antigravity-cockpit.exe"
+start "" "%~dp0multi-antigravity.exe"
 exit /b 0

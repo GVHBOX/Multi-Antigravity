@@ -1,4 +1,4 @@
 @echo off
 cd /d "%~dp0"
-"%~dp0antigravity-cockpit.exe" --tui
+"%~dp0multi-antigravity.exe" --tui
 pause

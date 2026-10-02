@@ -53,7 +53,7 @@ python tools/scan_comment.py --selfcheck
 报告、备份、脚本、截图、临时中间物全进 `.scratch/`（整体不进版本库）。
 根目录只允许：源码（`src/`、`ui/`）、文档与设计稿（`docs/`）、资源（`assets/`）、仓库元文件
 （`README.md`、`AGENTS.md`、`Cargo.toml`、`Cargo.lock`、`build.rs`、`.gitignore`、
-`tools/`、`start.bat`、`start_tui.bat`）、`target/`、`data/`、`antigravity-cockpit.exe`
+`tools/`、`start.bat`、`start_tui.bat`）、`target/`、`data/`、`multi-antigravity.exe`
 （发布产物，`*.exe` 已被 `.gitignore` 排除，是手工复制出来的，不是构建输出）。
 
 `assets/icon.png` 是 Slint 唯一引用的图片，**不能让 `.gitignore` 的 `*.png` 把它排除掉**
@@ -85,8 +85,8 @@ TUN 还是系统代理 / PAC / 安全软件 / 地区封锁），只有用户知�
   用 `run_event_loop()` 的话最小化到托盘会直接把进程结束掉。
 - **托盘回调在 tray-icon 自己的线程**：动 Slint 或窗口前必须 `slint::invoke_from_event_loop`。
 - **别再用「SetWindowPos 改 1px 触发重绘」的老 hack**：会把最大化窗口的布局搞坏。
-- **进程判定要排除自己**：座舱 exe 叫 `antigravity-cockpit.exe`，
-  任何按进程名 `contains("antigravity")` 的匹配都会把自己算成主机实例。
+- **进程判定要排除自己**：发布 exe 叫 `multi-antigravity.exe`，
+  任何按进程名 `contains("antigravity")` 的匹配都要排除 `multi`，避免把自己算成主机实例。
 - **状态只信扫描结果**：分身的「是否运行」以是否真扫到进程为准，
   不要把「上次 spawn 记下的 PID」当成运行状态的依据 —— 那会让分身关掉后仍显示运行中。
 - **不要动 `data/instance_2/home/.gemini/`**：里面有真实的 OAuth token。
@@ -107,7 +107,7 @@ TUN 还是系统代理 / PAC / 安全软件 / 地区封锁），只有用户知�
   核心原则：**「代码写完」不等于「生效交付」**。在桌面应用、后台服务与常驻守护进程开发中，用户通常习惯将程序固定到**系统开始菜单磁贴、桌面快捷方式或常驻服务路径**，以便一键唤起即开即测。必须以**目标路径的二进制产物完成原位物理覆盖、且加载运行最新代码**为交付闭环。严禁新建别名副本（如 `_new.exe`）或仅将产物留在构建目录（如 `target/release/`），否则用户从固定入口拉起时必定仍是旧版本，造成对接信息严重错位。
   1. **严格区分「源码编辑」与「运行态生效」**：严禁将“代码已修改”等同于“已生效完成”。
   2. **热更新进程接管授权（主动解除文件锁与端口占用）**：
-     - **正式接管授权**：在覆盖根目录/目标路径二进制（如 `antigravity-cockpit.exe`）或启动测试实例时，若遭遇旧实例正在运行引发的文件锁（Windows `WinError 32` / `Device or resource busy` / `LNK1104`）或端口占用（`EADDRINUSE`），**AI 获得正式授权主动接管并终止占用资源的旧进程**（精准定位目标 PID 执行 `taskkill /PID <pid> /F` 或相应系统命令）。
+     - **正式接管授权**：在覆盖根目录/目标路径二进制（如 `multi-antigravity.exe`）或启动测试实例时，若遭遇旧实例正在运行引发的文件锁（Windows `WinError 32` / `Device or resource busy` / `LNK1104`）或端口占用（`EADDRINUSE`），**AI 获得正式授权主动接管并终止占用资源的旧进程**（精准定位目标 PID 执行 `taskkill /PID <pid> /F` 或相应系统命令）。
      - **原位物理覆盖**：解除占用后，必须立即完成原目标路径文件的覆盖写入，确保用户按快捷键或点击磁贴时直接调起最新构建产物。
      - **严格限定接管边界**：仅限终止由本项目自身构建运行的旧版进程，严禁扩大范围，绝不触碰用户宿主环境或其他系统关键进程。
      - **如实通报执行结果**：触发接管后，回执中必须如实陈述事实（例如 `已自动终止旧版进程（PID: xxx）并完成原位覆盖交付`）。若遭遇非本项目进程占用或系统级无法解除的锁，方触发阻断警示协议置顶通报占用者 PID。
@@ -139,7 +139,7 @@ python tools/ui_probe.py kill <pid>
 ```
 
   `shot` 走 PrintWindow，比抓屏可靠；`key` 走 PostMessage，不会打扰前台程序。
-- **发布产物原位覆盖**：发布产物为根目录 `antigravity-cockpit.exe`（由 `target/release/multi-antigravity-rust.exe` 复制并重命名）。用户已将该 exe 固定至 Windows 10 开始菜单磁贴进行快速测试。若旧版正在运行导致覆盖被锁，必须依「热更新进程接管授权」直接终止旧版座舱进程并完成覆盖，严禁留在 `target/release/` 或生成副本，确保用户通过磁贴调起即为最新版。
+- **发布产物原位覆盖**：发布产物为根目录 `multi-antigravity.exe`（由 `target/release/multi-antigravity-rust.exe` 复制并重命名）。用户可将该 exe 固定至 Windows 10 开始菜单磁贴进行快速测试。若旧版正在运行导致覆盖被锁，必须依「热更新进程接管授权」直接终止旧版管理器进程并完成覆盖，严禁留在 `target/release/` 或生成副本，确保用户通过磁贴调起即为最新版。
 
 ## 环境事实
 
@@ -150,7 +150,7 @@ python tools/ui_probe.py kill <pid>
 - **默认渲染后端是软件光栅**：`main.rs` 里没设 `SLINT_BACKEND` 时强制 `winit-software`。
   界面文案别写「硬件加速 / GPU」，与事实不符。
 - **发布流程**：`cargo build --release` → 复制
-  `target\release\multi-antigravity-rust.exe` 到根目录改名 `antigravity-cockpit.exe`
+  `target\release\multi-antigravity-rust.exe` 到根目录改名 `multi-antigravity.exe`
   （README 里也写了这步）。exe 不进版本库。
 - **`target/` 5.2 GB 不动**：D 盘剩 450 GB，占 1.2%；清掉要换 2~5 分钟全量重编（增量只要 20 秒 / 57 秒）。
   真要省就只删 `target/debug`。

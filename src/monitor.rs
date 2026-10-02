@@ -74,7 +74,7 @@ impl TelemetryMonitor {
                 continue;
             }
             let name = proc.name().to_string_lossy().to_lowercase();
-            let is_antigravity = name.contains("antigravity") && !name.contains("cockpit");
+            let is_antigravity = name.contains("antigravity") && !name.contains("multi") && !name.contains("cockpit");
             let is_ls = name.contains("language_server") || name.contains("jetski");
 
             if !is_antigravity && !is_ls {

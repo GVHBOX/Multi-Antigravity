@@ -34,7 +34,7 @@
 ### 1. 桌面 GUI 客户端（推荐）
 直接运行根目录下的可执行文件或批处理脚本：
 ```text
-antigravity-cockpit.exe
+multi-antigravity.exe
 或
 start.bat
 ```
@@ -42,7 +42,7 @@ start.bat
 ### 2. 终端 TUI 仪表盘
 在命令行或终端中以字符模式运行：
 ```powershell
-.\antigravity-cockpit.exe --tui
+.\multi-antigravity.exe --tui
 或
 双击运行 start_tui.bat
 ```
@@ -52,10 +52,10 @@ start.bat
 cargo build --release
 ```
 产物位于 `target/release/multi-antigravity-rust.exe`。
-根目录的 `antigravity-cockpit.exe` 为该产物的发布副本：
+根目录的 `multi-antigravity.exe` 为该产物的发布副本：
 
 ```powershell
-copy target\release\multi-antigravity-rust.exe antigravity-cockpit.exe
+copy target\release\multi-antigravity-rust.exe multi-antigravity.exe
 ```
 
 ---
@@ -95,7 +95,7 @@ multi-antigravity-rust/
 │   └── ui.rs               # Ratatui TUI 渲染器
 ├── ui/                     # Slint 界面声明
 │   └── cockpit.slint       # 桌面端界面定义
-├── antigravity-cockpit.exe  # 发布版可执行文件
+├── multi-antigravity.exe    # 发布版可执行文件
 ├── build.rs                # PE 资源与 Slint 构建
 ├── Cargo.toml              # 项目依赖配置
 ├── AGENTS.md               # 作业规程与工程纪律
