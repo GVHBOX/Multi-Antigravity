@@ -103,19 +103,27 @@ fn trim_working_set() {
 fn get_cockpit_hwnd() -> windows_sys::Win32::Foundation::HWND {
     use windows_sys::Win32::Foundation::{HWND, LPARAM};
     use windows_sys::Win32::System::Threading::GetCurrentProcessId;
-    use windows_sys::Win32::UI::WindowsAndMessaging::{EnumWindows, GetWindowThreadProcessId};
+    use windows_sys::Win32::UI::WindowsAndMessaging::{
+        EnumWindows, GetClassNameW, GetWindowThreadProcessId,
+    };
 
     unsafe extern "system" fn enum_proc(hwnd: HWND, lparam: LPARAM) -> i32 {
         unsafe {
             let mut proc_id = 0u32;
             GetWindowThreadProcessId(hwnd, &mut proc_id);
             if proc_id == GetCurrentProcessId() {
-                let out_ptr = lparam as *mut HWND;
-                *out_ptr = hwnd;
-                0
-            } else {
-                1
+                let mut class_buf = [0u16; 64];
+                let len = GetClassNameW(hwnd, class_buf.as_mut_ptr(), class_buf.len() as i32);
+                if len > 0 {
+                    let class_name = String::from_utf16_lossy(&class_buf[..len as usize]);
+                    if class_name == "Window Class" {
+                        let out_ptr = lparam as *mut HWND;
+                        *out_ptr = hwnd;
+                        return 0;
+                    }
+                }
             }
+            1
         }
     }
 
@@ -124,6 +132,39 @@ fn get_cockpit_hwnd() -> windows_sys::Win32::Foundation::HWND {
         EnumWindows(Some(enum_proc), &mut found_hwnd as *mut _ as LPARAM);
     }
     found_hwnd
+}
+
+#[cfg(target_os = "windows")]
+fn apply_dark_window_attributes(hwnd: windows_sys::Win32::Foundation::HWND) {
+    use windows_sys::Win32::Graphics::Dwm::{
+        DwmSetWindowAttribute, DWMWA_CAPTION_COLOR, DWMWA_USE_IMMERSIVE_DARK_MODE,
+    };
+    use windows_sys::Win32::Graphics::Gdi::CreateSolidBrush;
+    use windows_sys::Win32::UI::WindowsAndMessaging::{SetClassLongPtrW, GCLP_HBRBACKGROUND};
+
+    if hwnd.is_null() {
+        return;
+    }
+    unsafe {
+        let dark = 1i32;
+        DwmSetWindowAttribute(
+            hwnd,
+            DWMWA_USE_IMMERSIVE_DARK_MODE as u32,
+            &dark as *const _ as *const _,
+            std::mem::size_of::<i32>() as u32,
+        );
+        let caption_color = 0x000E0907u32;
+        DwmSetWindowAttribute(
+            hwnd,
+            DWMWA_CAPTION_COLOR as u32,
+            &caption_color as *const _ as *const _,
+            std::mem::size_of::<u32>() as u32,
+        );
+        let brush = CreateSolidBrush(0x000E0907);
+        if !brush.is_null() {
+            SetClassLongPtrW(hwnd, GCLP_HBRBACKGROUND, brush as _);
+        }
+    }
 }
 
 #[cfg(target_os = "windows")]
@@ -145,11 +186,14 @@ fn show_cockpit_from_tray(ui_weak: &slint::Weak<MainWindow>) {
         let Some(ui) = ui_weak.upgrade() else {
             return;
         };
+        let cur = ui.get_redraw_tick();
+        ui.set_redraw_tick(if cur == 0 { 1 } else { 0 });
         let window = ui.window();
         let _ = window.show();
 
         let hwnd = get_cockpit_hwnd();
         if !hwnd.is_null() {
+            apply_dark_window_attributes(hwnd);
             unsafe {
                 if IsIconic(hwnd) != 0 {
                     ShowWindow(hwnd, SW_RESTORE);
@@ -316,21 +360,43 @@ fn show_cockpit_from_tray(ui_weak: &slint::Weak<MainWindow>) {
 
     let mut self_sys = sysinfo::System::new();
     #[cfg(windows)]
+    let restore_timer = Timer::default();
+    #[cfg(windows)]
+    let ui_weak_restore = main_window.as_weak();
+    #[cfg(windows)]
     let mut was_iconic = false;
+    #[cfg(windows)]
+    let mut configured_dark = false;
+
+    #[cfg(windows)]
+    restore_timer.start(TimerMode::Repeated, std::time::Duration::from_millis(50), move || {
+        let hwnd = get_cockpit_hwnd();
+        if hwnd.is_null() {
+            return;
+        }
+        if !configured_dark {
+            apply_dark_window_attributes(hwnd);
+            configured_dark = true;
+        }
+        let is_iconic = unsafe {
+            windows_sys::Win32::UI::WindowsAndMessaging::IsIconic(hwnd) != 0
+        };
+        if was_iconic && !is_iconic {
+            let Some(ui) = ui_weak_restore.upgrade() else {
+                was_iconic = is_iconic;
+                return;
+            };
+            let cur = ui.get_redraw_tick();
+            ui.set_redraw_tick(if cur == 0 { 1 } else { 0 });
+            ui.window().request_redraw();
+        }
+        was_iconic = is_iconic;
+    });
 
     timer.start(TimerMode::Repeated, std::time::Duration::from_millis(1000), move || {
         if let Some(ui) = ui_weak_mon.upgrade() {
             #[cfg(windows)]
             {
-                let hwnd = get_cockpit_hwnd();
-                let is_iconic = !hwnd.is_null() && unsafe {
-                    windows_sys::Win32::UI::WindowsAndMessaging::IsIconic(hwnd) != 0
-                };
-                if was_iconic && !is_iconic {
-                    ui.window().request_redraw();
-                }
-                was_iconic = is_iconic;
-
                 if unsafe {
                     windows_sys::Win32::System::Threading::WaitForSingleObject(activation_event, 0)
                 } == 0
@@ -410,6 +476,11 @@ fn show_cockpit_from_tray(ui_weak: &slint::Weak<MainWindow>) {
     }
 
     main_window.show()?;
+    #[cfg(target_os = "windows")]
+    {
+        let hwnd = get_cockpit_hwnd();
+        apply_dark_window_attributes(hwnd);
+    }
     let _ = slint::run_event_loop_until_quit();
     Ok(())
 }

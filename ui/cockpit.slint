@@ -150,7 +150,8 @@ export component MainWindow inherits Window {
     preferred-height: 1040px;
     min-width: 1400px;
     min-height: 820px;
-    background: #07090e;
+    background: root.redraw_tick == 0 ? #07090e : #07090f;
+    in-out property <int> redraw_tick: 0;
 
     in property <string> app_title: "Antigravity 多实例管理器";
     in property <string> app_subtitle: "环境隔离与进程监控";
@@ -213,6 +214,14 @@ export component MainWindow inherits Window {
                 reject
             }
         }
+    }
+
+    Rectangle {
+        x: 0;
+        y: 0;
+        width: parent.width;
+        height: parent.height;
+        background: root.redraw_tick == 0 ? #07090e : #07090f;
     }
 
     VerticalLayout {
