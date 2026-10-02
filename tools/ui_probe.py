@@ -6,11 +6,13 @@
 
     python tools/ui_probe.py launch                 # 起临时实例并打印 PID
     python tools/ui_probe.py rect <pid>             # 窗口尺寸 + DPI
-    python tools/ui_probe.py shot <pid> [scale] [name]
+    python tools/ui_probe.py max <pid>              # 最大化（验证超宽屏布局）
+    python tools/ui_probe.py shot <pid> [scale] [name] [x,y,w,h]
     python tools/ui_probe.py key <pid> <vk-16进制> [次数]
     python tools/ui_probe.py kill <pid>
 
 `scale` 是整数下采样倍率（默认 2，即 1916px 的窗口截成 958px）。截图落 `.scratch/`。
+`x,y,w,h` 是可选裁剪区（下采样后的坐标），用来盯住某个局部放大看。
 
 发按键走 PostMessage，只影响目标窗口，不会打扰前台程序。
 `key 52` 是 R 键（分身没运行时按它只写一条日志，适合刷日志量做显示测试）。
@@ -167,6 +169,16 @@ def cmd_shot(pid, scale=2, name="ui-shot.png", crop=None):
     return 0
 
 
+def cmd_max(pid):
+    got = find_window(pid)
+    if not got:
+        print("window not found")
+        return 1
+    user32.ShowWindow(got[0], 3)
+    time.sleep(1.2)
+    return cmd_rect(pid)
+
+
 def cmd_key(pid, vk, times):
     got = find_window(pid)
     if not got:
@@ -202,6 +214,8 @@ def main(argv):
             crop = tuple(int(v) for v in argv[4].split(","))
         return cmd_shot(int(argv[1]), int(argv[2]) if len(argv) > 2 else 2,
                         argv[3] if len(argv) > 3 else "ui-shot.png", crop)
+    if cmd == "max" and len(argv) >= 2:
+        return cmd_max(int(argv[1]))
     if cmd == "key" and len(argv) >= 3:
         return cmd_key(int(argv[1]), int(argv[2], 16), int(argv[3]) if len(argv) > 3 else 1)
     if cmd == "kill" and len(argv) >= 2:

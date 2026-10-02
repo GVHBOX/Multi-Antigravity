@@ -107,7 +107,9 @@ python tools/check_front_hygiene.py         # 铁律 2
 ```bash
 python tools/ui_probe.py launch            # 起临时实例，输出 PID
 python tools/ui_probe.py rect <pid>        # 读真实像素尺寸 + DPI + 逻辑尺寸
+python tools/ui_probe.py max <pid>         # 最大化，用来验证超宽屏下的布局
 python tools/ui_probe.py shot <pid>        # 截窗口内容到 .scratch/（被别的窗口挡着也能截）
+                                           #   可加裁剪区：shot <pid> 2 name.png 20,270,1860,300
 python tools/ui_probe.py key <pid> 52 20   # 发按键（52 = R，分身没跑时只写日志，适合刷日志量）
 python tools/ui_probe.py kill <pid>
 ```
