@@ -95,9 +95,7 @@ impl TelemetryMonitor {
             let is_main_electron = is_antigravity && !cmd_line.contains("--type=");
 
             if is_sub {
-                if is_main_electron && sub_electron_pid.is_none() {
-                    sub_electron_pid = Some(pid_u32);
-                } else if is_antigravity && sub_electron_pid.is_none() {
+                if is_main_electron || (is_antigravity && sub_electron_pid.is_none()) {
                     sub_electron_pid = Some(pid_u32);
                 } else if is_ls && sub_ls_pid.is_none() {
                     sub_ls_pid = Some(pid_u32);
@@ -105,9 +103,7 @@ impl TelemetryMonitor {
                 sub_cpu += proc.cpu_usage();
                 sub_mem_bytes += proc.memory();
             } else {
-                if is_main_electron && host_electron_pid.is_none() {
-                    host_electron_pid = Some(pid_u32);
-                } else if is_antigravity && host_electron_pid.is_none() {
+                if is_main_electron || (is_antigravity && host_electron_pid.is_none()) {
                     host_electron_pid = Some(pid_u32);
                 } else if is_ls && host_ls_pid.is_none() {
                     host_ls_pid = Some(pid_u32);

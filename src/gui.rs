@@ -9,19 +9,22 @@ use std::sync::{Arc, Mutex};
 
 slint::include_modules!();
 
-pub fn run_gui() -> Result<()> {
+pub fn run_gui(activation_event: crate::ActivationEvent) -> Result<()> {
     let config = Arc::new(Mutex::new(LauncherConfig::new()?));
     let sub_pid = Arc::new(Mutex::new(None::<u32>));
     let monitor = Arc::new(Mutex::new(TelemetryMonitor::new()));
 
     let main_window = MainWindow::new()?;
+    main_window.set_app_title("Antigravity 多实例管理器".into());
+    main_window.set_app_subtitle("环境隔离与进程监控".into());
+    main_window.set_app_version(env!("CARGO_PKG_VERSION").into());
 
     const ICON_RGBA: &[u8] = include_bytes!("../assets/icon_32.rgba");
     let tray_menu = tray_icon::menu::Menu::new();
-    let item_show = tray_icon::menu::MenuItem::new("显示座舱 (Show Cockpit)", true, None);
-    let item_sub = tray_icon::menu::MenuItem::new("启动/调出分身 (Launch Sub-instance)", true, None);
+    let item_show = tray_icon::menu::MenuItem::new("显示管理器", true, None);
+    let item_sub = tray_icon::menu::MenuItem::new("启动/唤醒分身", true, None);
     let sep = tray_icon::menu::PredefinedMenuItem::separator();
-    let item_quit = tray_icon::menu::MenuItem::new("彻底退出 (Exit)", true, None);
+    let item_quit = tray_icon::menu::MenuItem::new("退出管理器", true, None);
 
     let show_id = item_show.id().clone();
     let sub_id = item_sub.id().clone();
@@ -32,7 +35,7 @@ pub fn run_gui() -> Result<()> {
     let _tray = tray_icon::TrayIconBuilder::new()
         .with_menu(Box::new(tray_menu))
         .with_menu_on_left_click(false)
-        .with_tooltip("Antigravity 开发者座舱 · Studio Cockpit (Slint Native)")
+        .with_tooltip(format!("Antigravity 多实例管理器 v{}", env!("CARGO_PKG_VERSION")))
         .with_icon(tray_icon_img)
         .build()?;
 
@@ -193,16 +196,16 @@ fn show_cockpit_from_tray(ui_weak: &slint::Weak<MainWindow>) {
                 let mut p = pid_lock.lock().unwrap();
                 if let Some(pid) = *p {
                     c.bring_to_front(pid);
-                    ui.set_toast_message(format!("分身正在运行 (PID: {})，已前置置顶窗口。", pid).into());
-                    append_log(&ui, "WIN32", &format!("前置分身窗口 (PID: {})", pid));
+                    ui.set_toast_message(format!("已唤醒分身窗口 (PID: {})。", pid).into());
+                    append_log(&ui, "WIN32", &format!("唤醒分身窗口 (PID: {})", pid));
                 } else {
                     match c.spawn_detached() {
                         Ok(new_pid) => {
                             *p = Some(new_pid);
                             ui.set_sub_running(true);
                             ui.set_sub_pid(new_pid.to_string().into());
-                            ui.set_toast_message(format!("分身已脱机启动 (PID: {})。", new_pid).into());
-                            append_log(&ui, "SPAWN", &format!("分身已独立派生 (PID: {})", new_pid));
+                            ui.set_toast_message(format!("分身已在后台启动 (PID: {})。", new_pid).into());
+                            append_log(&ui, "SPAWN", &format!("分身已在后台启动 (PID: {})", new_pid));
                         }
                         Err(e) => {
                             ui.set_toast_message(format!("分身启动失败: {}", e).into());
@@ -252,12 +255,12 @@ fn show_cockpit_from_tray(ui_weak: &slint::Weak<MainWindow>) {
             if let Some(pid) = ls_pid {
                 let _ = c.kill_sub_instance_by_pid(pid);
                 ui.set_toast_message(
-                    format!("已回收分身语言服务 (PID: {})，Electron 会自动重新拉起。", pid).into(),
+                    format!("语言服务已重启 (PID: {})。", pid).into(),
                 );
-                append_log(&ui, "LANG_SVR", &format!("回收分身语言服务 (PID: {})", pid));
+                append_log(&ui, "LANG_SVR", &format!("重启语言服务 (PID: {})", pid));
             } else {
-                ui.set_toast_message("分身语言服务未在运行，无需回收。".into());
-                append_log(&ui, "LANG_SVR", "分身语言服务未在运行，无需回收");
+                ui.set_toast_message("语言服务未在运行。".into());
+                append_log(&ui, "LANG_SVR", "语言服务未在运行");
             }
         }
     });
@@ -271,11 +274,11 @@ fn show_cockpit_from_tray(ui_weak: &slint::Weak<MainWindow>) {
                 let c = conf.lock().unwrap();
                 match c.clear_token() {
                     Ok(true) => {
-                        ui.set_toast_message("独立凭据文件已擦除，下次打开将重新弹出 Google 登录授权。".into());
-                        append_log(&ui, "AUTH", "独立 Token 凭据已清空 (待重新授权)");
+                        ui.set_toast_message("独立凭据已清除。".into());
+                        append_log(&ui, "AUTH", "独立凭据已清除");
                     }
                     Ok(false) => {
-                        ui.set_toast_message("未发现独立凭据文件 (已处于未授权状态)。".into());
+                        ui.set_toast_message("未发现独立凭据。".into());
                     }
                     Err(e) => {
                         ui.set_toast_message(format!("清空凭据失败: {}", e).into());
@@ -293,8 +296,8 @@ fn show_cockpit_from_tray(ui_weak: &slint::Weak<MainWindow>) {
             if let Some(ui) = ui_weak.upgrade() {
                 let c = conf.lock().unwrap();
                 let _ = c.open_sandbox_in_explorer();
-                ui.set_toast_message("已在 Windows 资源管理器中打开沙箱目录。".into());
-                append_log(&ui, "EXPLORER", "弹出沙箱目录 data/instance_2");
+                ui.set_toast_message("已打开沙箱目录。".into());
+                append_log(&ui, "EXPLORER", "打开沙箱目录 data/instance_2");
             }
         }
     });
@@ -307,13 +310,37 @@ fn show_cockpit_from_tray(ui_weak: &slint::Weak<MainWindow>) {
 
     let timer = Timer::default();
     let ui_weak_mon = main_window.as_weak();
+    let ui_weak_activate = main_window.as_weak();
     let monitor_timer = Arc::clone(&monitor);
     let sub_pid_mon = Arc::clone(&sub_pid);
 
     let mut self_sys = sysinfo::System::new();
+    #[cfg(windows)]
+    let mut was_iconic = false;
 
     timer.start(TimerMode::Repeated, std::time::Duration::from_millis(1000), move || {
         if let Some(ui) = ui_weak_mon.upgrade() {
+            #[cfg(windows)]
+            {
+                let hwnd = get_cockpit_hwnd();
+                let is_iconic = !hwnd.is_null() && unsafe {
+                    windows_sys::Win32::UI::WindowsAndMessaging::IsIconic(hwnd) != 0
+                };
+                if was_iconic && !is_iconic {
+                    let _ = ui.window().hide();
+                    let _ = ui.window().show();
+                    ui.window().request_redraw();
+                }
+                was_iconic = is_iconic;
+
+                if unsafe {
+                    windows_sys::Win32::System::Threading::WaitForSingleObject(activation_event, 0)
+                } == 0
+                {
+                    show_cockpit_from_tray(&ui_weak_activate);
+                }
+            }
+
             let mut mon = monitor_timer.lock().unwrap();
             let known_sub = *sub_pid_mon.lock().unwrap();
             mon.refresh(known_sub);
@@ -379,7 +406,7 @@ fn show_cockpit_from_tray(ui_weak: &slint::Weak<MainWindow>) {
                 "未检测到主机实例进程".to_string()
             }
         };
-        append_log(&main_window, "SYSTEM", "Slint 原生 GUI 内核初始化完成");
+        append_log(&main_window, "SYSTEM", "座舱就绪");
         append_log(&main_window, "SANDBOX", &format!("沙箱根目录: {sandbox_path}"));
         append_log(&main_window, "MONITOR", &host_line);
     }

@@ -6,3 +6,4 @@
 !assets/icon.png
 *.WebView2/
 *.exe
+__pycache__/

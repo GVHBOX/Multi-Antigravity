@@ -1,38 +1,38 @@
-# ⚡ Antigravity 开发者座舱 (Antigravity Studio Cockpit)
+# Antigravity 多实例管理器 (Antigravity Multi-Instance Manager) v1.0.0
 
-用 Rust 原生打造的 Google Antigravity 高性能双开调度与环境隔离系统。支持现代化桌面 GUI 客户端与极客终端 TUI 双模运行。
-
----
-
-## 🌟 核心特性
-
-- **现代极客原生 GUI 客户端（默认运行）**：
-  - 基于 **Slint 原生矢量渲染引擎** 构建（默认 `winit-software` 软件光栅后端，不依赖 GPU 驱动），**彻底摒弃 Chromium 与 WebView2**，零外部浏览器运行时依赖。
-  - **极致超低内存开销**：单进程物理内存开销仅 **~12 MB**，无任何附加子进程，冷启动耗时 **< 15ms**。
-  - **目录零污染**：100% 纯机器码自绘，绝不在本地目录生成任何 `.WebView2` 或浏览器缓存文件。
-  - **点击关闭缩小至系统托盘**：点击窗口右上角 `[✕]` 自动最小化至 Windows 系统通知区托盘常驻，避免意外关闭中断后台工作；单击/双击托盘图标秒级唤回并置顶座舱；右键托盘支持快捷唤出/调度分身。
-  - **100% 离线自包含**：零外部 CDN / 字体网络依赖，断网弱网环境下依然毫秒级渲染。
-
-- **极客终端 TUI 模式（支持 `--tui` 参数）**：
-  - 基于 Ratatui 构建的单屏紧凑仪表盘，22~24 行单屏尽收眼底，无需滚动浏览。
-  - 双实例实时 CPU / 物理内存 (RSS) 采集与本地语言服务端口探测。
-
-- **Win32 进程完全脱钩 (Detached)**：
-  - 采用 `CREATE_BREAKAWAY_FROM_JOB (0x01000000)` 与 `DETACHED_PROCESS (0x00000008)` 独立派生子进程树。
-  - **关闭座舱绝不影响已启动的分身运行**，随时退出座舱，随时重新打开接管。
-
-- **物理级环境沙箱隔离**：
-  - `USERPROFILE` & `HOME` 隔离到 `data/instance_2/home`，彻底杜绝 `.gemini` 配置文件碰撞。
-  - `APPDATA` 隔离到 `data/instance_2/AppData/Roaming`，独立插件与窗口缓存。
-  - `SSH_CONNECTION=127.0.0.1 50000 127.0.0.1 22` 旁路钩子：强制语言服务使用独立文件凭据 (`jetski-standalone-oauth-token`)，不污染主号的 Windows 凭据管理器。
-  - `LOCALAPPDATA` 保留原生系统路径：分身调用系统 Chrome 浏览器授权时，完美继承已有的 Chrome 多用户 Profile，无需重新登录浏览器。
+用 Rust 构建的 Google Antigravity 多开调度、环境隔离与进程监控工具。支持桌面 GUI 客户端与终端 TUI 双模运行。
 
 ---
 
-## 🚀 快速启动
+## 核心特性
+
+- **轻量桌面客户端（默认 Slint 运行）**：
+  - 基于 Slint 矢量引擎（`winit-software` 软件光栅后端，不依赖 GPU），无 Chromium / WebView2 运行时依赖。
+  - 单进程内存开销约 15 MB，无附加子进程，启动迅速。
+  - 零运行缓存污染：纯代码自绘，不生成 `.WebView2` 或额外浏览器缓存。
+  - 点击关闭缩小至系统托盘常驻，单击/双击托盘图标唤回座舱，支持右键托盘快捷控制。
+  - 资源离线自包含：无外部 CDN 或网络字体依赖。
+
+- **终端 TUI 模式（`--tui` 参数）**：
+  - 基于 Ratatui 构建的单屏紧凑仪表盘，24 行内显示完整状态。
+  - 实时采集双实例 CPU、物理内存 (RSS) 及语言服务端口。
+
+- **后台独立子进程 (Detached)**：
+  - 通过 `CREATE_BREAKAWAY_FROM_JOB` 与 `DETACHED_PROCESS` 派生子进程。
+  - 关闭座舱不影响已运行的分身，随时退出、随时重连接管。
+
+- **多账号环境隔离**：
+  - `USERPROFILE` 与 `HOME` 重定向至 `data/instance_2/home`，避免配置文件冲突。
+  - `APPDATA` 重定向至 `data/instance_2/AppData/Roaming`，独立扩展与缓存。
+  - 注入 `SSH_CONNECTION` 环境变量旁路，强制语言服务使用独立文件凭据 (`jetski-standalone-oauth-token`)。
+  - 保持 `LOCALAPPDATA` 系统默认路径，直接复用已有的 Chrome 登录环境。
+
+---
+
+## 快速启动
 
 ### 1. 桌面 GUI 客户端（推荐）
-直接双击运行根目录下的可执行文件或批处理脚本：
+直接运行根目录下的可执行文件或批处理脚本：
 ```text
 antigravity-cockpit.exe
 或
@@ -40,7 +40,7 @@ start.bat
 ```
 
 ### 2. 终端 TUI 仪表盘
-如果需要在命令行或终端中以纯字符模式运行：
+在命令行或终端中以字符模式运行：
 ```powershell
 .\antigravity-cockpit.exe --tui
 或
@@ -51,8 +51,8 @@ start.bat
 ```powershell
 cargo build --release
 ```
-编译产物位于 `target/release/multi-antigravity-rust.exe`，已通过 Windows PE 资源嵌入应用图标。
-根目录的 `antigravity-cockpit.exe` 是该产物复制改名后的发布版（`*.exe` 已被 `.gitignore` 排除，不会进版本库）：
+产物位于 `target/release/multi-antigravity-rust.exe`。
+根目录的 `antigravity-cockpit.exe` 为该产物的发布副本：
 
 ```powershell
 copy target\release\multi-antigravity-rust.exe antigravity-cockpit.exe
@@ -60,51 +60,53 @@ copy target\release\multi-antigravity-rust.exe antigravity-cockpit.exe
 
 ---
 
-## ⌨️ 快捷操作矩阵
+## 快捷键操作
 
 | 按键 | 功能 | 说明 | 适用 |
 | :---: | :--- | :--- | :---: |
-| **<kbd>Space</kbd>** | **启动 / 唤醒分身** | 未运行时独立启动分身；运行中时调用 Win32 `SetForegroundWindow` 将分身窗口置顶激活 | GUI / TUI |
-| **<kbd>K</kbd>** | **停止分身** | 优雅终止分身进程树，主机实例不受任何干扰 | GUI / TUI |
-| **<kbd>R</kbd>** | **回收语言服务** | 终止分身的语言服务进程，Electron 会自动重新拉起并刷新本地端口 | GUI / TUI |
-| **<kbd>C</kbd>** | **换号清空凭证** | 一键擦除独立 Token 文件，下次打开时 Chrome 会再次弹出 Google 账号选择页 | GUI / TUI |
-| **<kbd>O</kbd>** | **打开沙箱目录** | 在 Windows 资源管理器中弹出 `data/instance_2` 数据目录 | GUI / TUI |
-| **<kbd>T</kbd>** | **中 / EN 切换** | 纯中文界面与纯英文界面瞬时切换 | 仅 TUI |
-| **<kbd>L</kbd>** | **控制台清屏** | 清空诊断日志缓冲区 | 仅 TUI |
-| **<kbd>Q</kbd>** | **彻底退出座舱** | 完全释放系统资源并退出应用（点击 `[✕]` 为最小化至托盘） | GUI / TUI |
+| **<kbd>Space</kbd>** | **启动 / 唤醒分身** | 未运行时启动分身；运行中时唤醒分身窗口置顶 | GUI / TUI |
+| **<kbd>K</kbd>** | **停止分身** | 终止分身进程树 | GUI / TUI |
+| **<kbd>R</kbd>** | **重启语言服务** | 终止分身语言服务进程，触发自动重启刷新端口 | GUI / TUI |
+| **<kbd>C</kbd>** | **清除独立凭据** | 删除独立 Token 文件，下次打开时可重新登录账号 | GUI / TUI |
+| **<kbd>O</kbd>** | **打开沙箱目录** | 打开 `data/instance_2` 目录 | GUI / TUI |
+| **<kbd>T</kbd>** | **中 / EN 切换** | 切换界面语言 | 仅 TUI |
+| **<kbd>L</kbd>** | **控制台清屏** | 清空日志缓冲区 | 仅 TUI |
+| **<kbd>Q</kbd>** | **退出座舱** | 退出座舱应用（窗口点击 `[✕]` 为最小化至托盘） | GUI / TUI |
 
 ---
 
-## 📁 目录结构
+## 目录结构
 
 ```text
 multi-antigravity-rust/
-├── assets/                 # 应用静态资产（图标源图、.ico、托盘裸数据）
+├── assets/                 # 静态资源（图标源图、.ico、托盘数据）
 │   ├── icon.ico            # Windows PE 资源图标
-│   ├── icon.png            # 1024x1024 高清母版
-│   └── icon_32.rgba        # 托盘内嵌像素矩阵
+│   ├── icon.png            # 高清图标母版
+│   └── icon_32.rgba        # 托盘像素矩阵
+├── docs/                   # 项目文档与视觉设计稿
+│   └── cockpit-ui-prototype.html # 1920×1080 满屏界面视觉原型
 ├── src/                    # Rust 核心源代码
-│   ├── app.rs              # TUI 应用状态机与事件调度
-│   ├── gui.rs              # Slint 原生 GUI 桌面客户端与系统托盘
-│   ├── i18n.rs             # 纯中/英多语言文案字典
-│   ├── launcher.rs         # Win32 进程派生、凭据擦除与沙箱隔离内核
-│   ├── main.rs             # CLI / GUI 模式分流与 Windows 子系统配置
-│   ├── monitor.rs          # 实例进程扫描、端口探测与内存遥测
-│   └── ui.rs               # Ratatui TUI 布局渲染器
-├── ui/                     # 现代声明式 UI 规范
-│   └── cockpit.slint       # Slint 原生矢量界面声明
-├── antigravity-cockpit.exe  # 编译发布的 Windows 原生客户端 (零 Chromium)
-├── build.rs                # Windows PE 资源编译 (winres) 与 Slint 编译 (slint-build)
+│   ├── app.rs              # 状态机与事件调度
+│   ├── gui.rs              # Slint GUI 桌面端与系统托盘
+│   ├── i18n.rs             # 多语言文案字典
+│   ├── launcher.rs         # 进程派生、凭据管理与环境隔离
+│   ├── main.rs             # 入口分流与单实例控制
+│   ├── monitor.rs          # 进程扫描、端口探测与遥测
+│   └── ui.rs               # Ratatui TUI 渲染器
+├── ui/                     # Slint 界面声明
+│   └── cockpit.slint       # 桌面端界面定义
+├── antigravity-cockpit.exe  # 发布版可执行文件
+├── build.rs                # PE 资源与 Slint 构建
 ├── Cargo.toml              # 项目依赖配置
-├── AGENTS.md               # 作业规程（4 条铁律、项目纪律、环境事实）
-├── tools/                  # 铁律机器强制扫描器（零注释 / 界面文案）
-├── start.bat               # 原生 GUI 一键启动脚本
-└── start_tui.bat           # 终端 TUI 一键启动脚本
+├── AGENTS.md               # 作业规程与工程纪律
+├── tools/                  # 规程自动化检查工具
+├── start.bat               # GUI 一键启动脚本
+└── start_tui.bat           # TUI 一键启动脚本
+```
 
-自检（AGENTS.md 铁律的机器强制）：
+自检（AGENTS.md 规程机器检查）：
 
 ```powershell
 python tools/scan_comment.py
 python tools/check_front_hygiene.py
-```
 ```

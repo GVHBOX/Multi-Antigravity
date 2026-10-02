@@ -7,7 +7,7 @@ mod launcher;
 mod monitor;
 mod ui;
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use app::App;
 use crossterm::{
     event::{self, Event, KeyCode, KeyEventKind},
@@ -18,7 +18,88 @@ use ratatui::{backend::CrosstermBackend, Terminal};
 use std::env;
 use std::io::stdout;
 use std::panic;
+use std::ptr::null;
 use std::time::{Duration, Instant};
+
+#[cfg(windows)]
+pub type ActivationEvent = windows_sys::Win32::Foundation::HANDLE;
+
+#[cfg(not(windows))]
+pub type ActivationEvent = ();
+
+#[cfg(windows)]
+struct SingleInstanceGuard {
+    mutex: windows_sys::Win32::Foundation::HANDLE,
+    activation_event: ActivationEvent,
+}
+
+#[cfg(windows)]
+impl Drop for SingleInstanceGuard {
+    fn drop(&mut self) {
+        unsafe {
+            windows_sys::Win32::Foundation::CloseHandle(self.activation_event);
+            windows_sys::Win32::Foundation::CloseHandle(self.mutex);
+        }
+    }
+}
+
+#[cfg(windows)]
+fn acquire_single_instance() -> Result<Option<SingleInstanceGuard>> {
+    use windows_sys::Win32::Foundation::{GetLastError, ERROR_ALREADY_EXISTS};
+    use windows_sys::Win32::System::Threading::{CreateEventW, CreateMutexW, SetEvent};
+
+    let mutex_name: Vec<u16> = "Local\\AntigravityCockpit.SingleInstance\0"
+        .encode_utf16()
+        .collect();
+    let event_name: Vec<u16> = "Local\\AntigravityCockpit.Activate\0"
+        .encode_utf16()
+        .collect();
+    let activation_event = unsafe { CreateEventW(null(), 0, 0, event_name.as_ptr()) };
+    if activation_event.is_null() {
+        return Err(anyhow!("无法创建座舱激活事件"));
+    }
+    let mutex = unsafe { CreateMutexW(null(), 1, mutex_name.as_ptr()) };
+    if mutex.is_null() {
+        unsafe {
+            windows_sys::Win32::Foundation::CloseHandle(activation_event);
+        }
+        return Err(anyhow!("无法创建座舱单实例锁"));
+    }
+    if unsafe { GetLastError() } == ERROR_ALREADY_EXISTS {
+        unsafe {
+            SetEvent(activation_event);
+            windows_sys::Win32::Foundation::CloseHandle(activation_event);
+            windows_sys::Win32::Foundation::CloseHandle(mutex);
+        }
+        return Ok(None);
+    }
+    Ok(Some(SingleInstanceGuard {
+        mutex,
+        activation_event,
+    }))
+}
+
+#[cfg(not(windows))]
+struct SingleInstanceGuard;
+
+#[cfg(not(windows))]
+impl SingleInstanceGuard {
+    fn activation_event(&self) -> ActivationEvent {
+        ()
+    }
+}
+
+#[cfg(not(windows))]
+fn acquire_single_instance() -> Result<Option<SingleInstanceGuard>> {
+    Ok(Some(SingleInstanceGuard))
+}
+
+#[cfg(windows)]
+impl SingleInstanceGuard {
+    fn activation_event(&self) -> ActivationEvent {
+        self.activation_event
+    }
+}
 
 fn setup_panic_hook() {
     let original_hook = panic::take_hook();
@@ -30,6 +111,11 @@ fn setup_panic_hook() {
 }
 
 fn main() -> Result<()> {
+    let Some(single_instance) = acquire_single_instance()? else {
+        return Ok(());
+    };
+    let activation_event = single_instance.activation_event();
+
     let args: Vec<String> = env::args().collect();
     let use_tui = args.iter().any(|a| a == "--tui" || a == "-t");
 
@@ -39,7 +125,7 @@ fn main() -> Result<()> {
                 env::set_var("SLINT_BACKEND", "winit-software");
             }
         }
-        return gui::run_gui();
+        return gui::run_gui(activation_event);
     }
 
     #[cfg(windows)]
@@ -113,8 +199,8 @@ fn main() -> Result<()> {
     terminal.show_cursor()?;
 
     println!();
-    println!(" [Antigravity Cockpit] 监控座舱已安全退出。");
-    println!(" 提示：分身通过 Win32 DETACHED 独立生成，正在系统后台继续平稳运行！");
+    println!(" [Antigravity Multi-Instance Manager v{}] 管理器已退出。", env!("CARGO_PKG_VERSION"));
+    println!(" 分身已在后台独立运行。");
     println!();
 
     Ok(())

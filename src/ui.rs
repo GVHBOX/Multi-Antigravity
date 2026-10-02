@@ -24,6 +24,8 @@ const COLOR_SLATE_DIM: Color = Color::Rgb(100, 116, 139);
 
 pub fn render(frame: &mut Frame, app: &App) {
     let size = frame.area();
+    let compact = size.width < 120;
+    let dock_height = if compact { 4 } else { 3 };
 
     let chunks = Layout::default()
         .direction(Direction::Vertical)
@@ -32,7 +34,7 @@ pub fn render(frame: &mut Frame, app: &App) {
             Constraint::Length(3),
             Constraint::Length(8),
             Constraint::Min(8),
-            Constraint::Length(3),
+            Constraint::Length(dock_height),
         ])
         .split(size);
 
@@ -62,6 +64,8 @@ fn render_header(frame: &mut Frame, area: Rect, app: &App) {
         Span::styled(" ⚡ ", Style::default().fg(Color::Rgb(254, 240, 138)).bg(Color::Rgb(79, 70, 229)).bold()),
         Span::raw(" "),
         Span::styled(s.app_title, Style::default().fg(Color::White).bold()),
+        Span::raw(" "),
+        Span::styled(format!("v{}", env!("CARGO_PKG_VERSION")), Style::default().fg(COLOR_CYAN).bold()),
         Span::styled(" / ", Style::default().fg(COLOR_SLATE_DIM)),
         Span::styled(s.app_subtitle, Style::default().fg(COLOR_SLATE_MUTED)),
     ]);
@@ -88,15 +92,20 @@ fn render_header(frame: &mut Frame, area: Rect, app: &App) {
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
-    frame.render_widget(Paragraph::new(title_line), inner);
-    frame.render_widget(
-        Paragraph::new(right_line).alignment(Alignment::Right),
-        inner,
-    );
+    if area.width < 120 {
+        frame.render_widget(Paragraph::new(title_line), inner);
+    } else {
+        frame.render_widget(Paragraph::new(title_line), inner);
+        frame.render_widget(
+            Paragraph::new(right_line).alignment(Alignment::Right),
+            inner,
+        );
+    }
 }
 
 fn render_kpi_tiles(frame: &mut Frame, area: Rect, app: &App) {
     let s = app.language.strings();
+    let compact = area.width < 120;
     let tiles = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([
@@ -108,7 +117,13 @@ fn render_kpi_tiles(frame: &mut Frame, area: Rect, app: &App) {
         .split(area);
 
     let host_online = app.monitor.host.is_running;
-    let host_pid_str = app.monitor.host.electron_pid.map(|p| format!("PID: {}", p)).unwrap_or_else(|| "--".into());
+    let host_pid_str = app.monitor.host.electron_pid.map(|p| {
+        if compact {
+            format!("{}", p)
+        } else {
+            format!("PID: {}", p)
+        }
+    }).unwrap_or_else(|| "--".into());
     let t1_content = Line::from(vec![
         Span::styled(if host_online { "● " } else { "○ " }, Style::default().fg(if host_online { COLOR_EMERALD } else { COLOR_SLATE_DIM })),
         Span::styled(if host_online { s.status_online } else { s.status_stopped }, Style::default().fg(if host_online { COLOR_EMERALD } else { COLOR_SLATE_DIM }).bold()),
@@ -118,7 +133,7 @@ fn render_kpi_tiles(frame: &mut Frame, area: Rect, app: &App) {
     frame.render_widget(
         Paragraph::new(t1_content).block(
             Block::default()
-                .title(Span::styled(format!(" {} ", s.tile_host_title), Style::default().fg(COLOR_SLATE_MUTED)))
+                .title(Span::styled(format!(" {} ", if compact { "主机" } else { s.tile_host_title }), Style::default().fg(COLOR_SLATE_MUTED)))
                 .borders(Borders::ALL)
                 .border_type(BorderType::Rounded)
                 .border_style(Style::default().fg(COLOR_BORDER_DEFAULT))
@@ -128,7 +143,13 @@ fn render_kpi_tiles(frame: &mut Frame, area: Rect, app: &App) {
     );
 
     let sub_online = app.monitor.sub.is_running;
-    let sub_pid_str = app.monitor.sub.electron_pid.map(|p| format!("PID: {}", p)).unwrap_or_else(|| "--".into());
+    let sub_pid_str = app.monitor.sub.electron_pid.map(|p| {
+        if compact {
+            format!("{}", p)
+        } else {
+            format!("PID: {}", p)
+        }
+    }).unwrap_or_else(|| "--".into());
     let t2_content = Line::from(vec![
         Span::styled(if sub_online { "● " } else { "○ " }, Style::default().fg(if sub_online { COLOR_CYAN } else { COLOR_SLATE_DIM })),
         Span::styled(if sub_online { s.status_detached } else { s.status_stopped }, Style::default().fg(if sub_online { COLOR_CYAN } else { COLOR_SLATE_DIM }).bold()),
@@ -138,7 +159,7 @@ fn render_kpi_tiles(frame: &mut Frame, area: Rect, app: &App) {
     frame.render_widget(
         Paragraph::new(t2_content).block(
             Block::default()
-                .title(Span::styled(format!(" {} ", s.tile_sub_title), Style::default().fg(COLOR_SLATE_MUTED)))
+                .title(Span::styled(format!(" {} ", if compact { "分身" } else { s.tile_sub_title }), Style::default().fg(COLOR_SLATE_MUTED)))
                 .borders(Borders::ALL)
                 .border_type(BorderType::Rounded)
                 .border_style(Style::default().fg(if sub_online { COLOR_CYAN } else { COLOR_BORDER_DEFAULT }))
@@ -150,14 +171,28 @@ fn render_kpi_tiles(frame: &mut Frame, area: Rect, app: &App) {
     let host_mem = app.monitor.host.memory_rss_mb;
     let sub_mem = app.monitor.sub.memory_rss_mb;
     let t3_content = Line::from(vec![
-        Span::styled(format!("{:.1} MB", app.monitor.total_memory_mb), Style::default().fg(Color::White).bold()),
+        Span::styled(
+            if compact {
+                format!("{:.0}M", app.monitor.total_memory_mb)
+            } else {
+                format!("{:.1} MB", app.monitor.total_memory_mb)
+            },
+            Style::default().fg(Color::White).bold(),
+        ),
         Span::raw(" "),
-        Span::styled(format!("(H:{:.0}M|S:{:.0}M)", host_mem, sub_mem), Style::default().fg(COLOR_SLATE_DIM)),
+        Span::styled(
+            if compact {
+                format!("H:{:.0} S:{:.0}", host_mem, sub_mem)
+            } else {
+                format!("(H:{:.0}M|S:{:.0}M)", host_mem, sub_mem)
+            },
+            Style::default().fg(COLOR_SLATE_DIM),
+        ),
     ]);
     frame.render_widget(
         Paragraph::new(t3_content).block(
             Block::default()
-                .title(Span::styled(format!(" {} ", s.tile_mem_title), Style::default().fg(COLOR_SLATE_MUTED)))
+                .title(Span::styled(format!(" {} ", if compact { "内存" } else { s.tile_mem_title }), Style::default().fg(COLOR_SLATE_MUTED)))
                 .borders(Borders::ALL)
                 .border_type(BorderType::Rounded)
                 .border_style(Style::default().fg(COLOR_BORDER_DEFAULT))
@@ -174,7 +209,7 @@ fn render_kpi_tiles(frame: &mut Frame, area: Rect, app: &App) {
     frame.render_widget(
         Paragraph::new(t4_content).block(
             Block::default()
-                .title(Span::styled(format!(" {} ", s.tile_iso_title), Style::default().fg(COLOR_SLATE_MUTED)))
+                .title(Span::styled(format!(" {} ", if compact { "隔离" } else { s.tile_iso_title }), Style::default().fg(COLOR_SLATE_MUTED)))
                 .borders(Borders::ALL)
                 .border_type(BorderType::Rounded)
                 .border_style(Style::default().fg(COLOR_BORDER_DEFAULT))
@@ -186,20 +221,22 @@ fn render_kpi_tiles(frame: &mut Frame, area: Rect, app: &App) {
 
 fn render_dual_instances(frame: &mut Frame, area: Rect, app: &App) {
     let s = app.language.strings();
+    let compact = area.width < 120;
     let cols = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
         .split(area);
 
     let host = &app.monitor.host;
-    let host_pid_text = match (host.electron_pid, host.ls_pid) {
-        (Some(e), Some(ls)) => format!("Electron ({}) + GoLS ({})", e, ls),
-        (Some(e), None) => format!("Electron ({})", e),
+    let host_pid_text = match (host.electron_pid, host.ls_pid, compact) {
+        (Some(e), Some(ls), false) => format!("Electron ({}) + GoLS ({})", e, ls),
+        (Some(e), None, false) => format!("Electron ({})", e),
+        (Some(e), _, true) => format!("PID {}", e),
         _ => "--".to_string(),
     };
     let host_port_text = host.ls_port.map(|p| format!("127.0.0.1:{}", p)).unwrap_or_else(|| "--".into());
 
-    let host_lines = vec![
+    let mut host_lines = vec![
         Line::from(vec![
             Span::styled(format!("{}: ", s.lbl_process_arch), Style::default().fg(COLOR_SLATE_MUTED)),
             Span::styled(host_pid_text, Style::default().fg(Color::White)),
@@ -212,11 +249,21 @@ fn render_dual_instances(frame: &mut Frame, area: Rect, app: &App) {
             Span::styled(format!("{}: ", s.lbl_account_state), Style::default().fg(COLOR_SLATE_MUTED)),
             Span::styled(s.inst1_account, Style::default().fg(COLOR_EMERALD).bold()),
         ]),
-        Line::from(vec![
+    ];
+    if compact {
+        host_lines.push(Line::from(vec![
+            Span::styled("CPU: ", Style::default().fg(COLOR_SLATE_MUTED)),
+            Span::styled(format!("{:.1}% ", host.cpu_usage), Style::default().fg(COLOR_EMERALD).bold()),
+            Span::styled(make_mini_bar(host.cpu_usage as f64, 100.0, 4), Style::default().fg(COLOR_EMERALD)),
+            Span::styled(" RSS: ", Style::default().fg(COLOR_SLATE_MUTED)),
+            Span::styled(format!("{:.0}M", host.memory_rss_mb), Style::default().fg(Color::White).bold()),
+        ]));
+    } else {
+        host_lines.push(Line::from(vec![
             Span::styled(format!("{}: ", s.lbl_token_store), Style::default().fg(COLOR_SLATE_MUTED)),
             Span::styled(s.mode_win_cred, Style::default().fg(COLOR_SLATE_DIM)),
-        ]),
-        Line::from(vec![
+        ]));
+        host_lines.push(Line::from(vec![
             Span::styled(format!("{}: ", s.lbl_cpu_usage), Style::default().fg(COLOR_SLATE_MUTED)),
             Span::styled(format!("{:.1}% ", host.cpu_usage), Style::default().fg(COLOR_EMERALD).bold()),
             Span::styled(make_mini_bar(host.cpu_usage as f64, 100.0, 8), Style::default().fg(COLOR_EMERALD)),
@@ -224,8 +271,8 @@ fn render_dual_instances(frame: &mut Frame, area: Rect, app: &App) {
             Span::styled(format!("{}: ", s.lbl_mem_rss), Style::default().fg(COLOR_SLATE_MUTED)),
             Span::styled(format!("{:.1} MB ", host.memory_rss_mb), Style::default().fg(Color::White).bold()),
             Span::styled(make_mini_bar(host.memory_rss_mb, 1024.0, 8), Style::default().fg(COLOR_INDIGO)),
-        ]),
-    ];
+        ]));
+    }
 
     let host_title = format!(" {} [{}] ", s.inst1_title, s.badge_host_primary);
     frame.render_widget(
@@ -241,9 +288,10 @@ fn render_dual_instances(frame: &mut Frame, area: Rect, app: &App) {
     );
 
     let sub = &app.monitor.sub;
-    let sub_pid_text = match (sub.electron_pid, sub.ls_pid) {
-        (Some(e), Some(ls)) => format!("Detached ({}) + GoLS ({})", e, ls),
-        (Some(e), None) => format!("Detached ({})", e),
+    let sub_pid_text = match (sub.electron_pid, sub.ls_pid, compact) {
+        (Some(e), Some(ls), false) => format!("Detached ({}) + GoLS ({})", e, ls),
+        (Some(e), None, false) => format!("Detached ({})", e),
+        (Some(e), _, true) => format!("PID {}", e),
         _ => if sub.is_running { s.status_detached.to_string() } else { s.status_stopped.to_string() },
     };
     let sub_port_text = sub.ls_port.map(|p| format!("127.0.0.1:{}", p)).unwrap_or_else(|| "--".into());
@@ -254,7 +302,7 @@ fn render_dual_instances(frame: &mut Frame, area: Rect, app: &App) {
         Span::styled(s.inst2_empty_user, Style::default().fg(COLOR_AMBER).bold())
     };
 
-    let sub_lines = vec![
+    let mut sub_lines = vec![
         Line::from(vec![
             Span::styled(format!("{}: ", s.lbl_process_arch), Style::default().fg(COLOR_SLATE_MUTED)),
             Span::styled(sub_pid_text, Style::default().fg(COLOR_CYAN)),
@@ -267,11 +315,21 @@ fn render_dual_instances(frame: &mut Frame, area: Rect, app: &App) {
             Span::styled(format!("{}: ", s.lbl_account_state), Style::default().fg(COLOR_SLATE_MUTED)),
             account_status,
         ]),
-        Line::from(vec![
+    ];
+    if compact {
+        sub_lines.push(Line::from(vec![
+            Span::styled("CPU: ", Style::default().fg(COLOR_SLATE_MUTED)),
+            Span::styled(format!("{:.1}% ", sub.cpu_usage), Style::default().fg(COLOR_CYAN).bold()),
+            Span::styled(make_mini_bar(sub.cpu_usage as f64, 100.0, 4), Style::default().fg(COLOR_CYAN)),
+            Span::styled(" RSS: ", Style::default().fg(COLOR_SLATE_MUTED)),
+            Span::styled(format!("{:.0}M", sub.memory_rss_mb), Style::default().fg(Color::White).bold()),
+        ]));
+    } else {
+        sub_lines.push(Line::from(vec![
             Span::styled(format!("{}: ", s.lbl_token_store), Style::default().fg(COLOR_SLATE_MUTED)),
             Span::styled(s.mode_file_store, Style::default().fg(COLOR_CYAN)),
-        ]),
-        Line::from(vec![
+        ]));
+        sub_lines.push(Line::from(vec![
             Span::styled(format!("{}: ", s.lbl_cpu_usage), Style::default().fg(COLOR_SLATE_MUTED)),
             Span::styled(format!("{:.1}% ", sub.cpu_usage), Style::default().fg(COLOR_CYAN).bold()),
             Span::styled(make_mini_bar(sub.cpu_usage as f64, 100.0, 8), Style::default().fg(COLOR_CYAN)),
@@ -279,8 +337,8 @@ fn render_dual_instances(frame: &mut Frame, area: Rect, app: &App) {
             Span::styled(format!("{}: ", s.lbl_mem_rss), Style::default().fg(COLOR_SLATE_MUTED)),
             Span::styled(format!("{:.1} MB ", sub.memory_rss_mb), Style::default().fg(Color::White).bold()),
             Span::styled(make_mini_bar(sub.memory_rss_mb, 1024.0, 8), Style::default().fg(COLOR_CYAN)),
-        ]),
-    ];
+        ]));
+    }
 
     let sub_badge = if sub.is_running { s.badge_sub_detached } else { s.badge_sub_stopped };
     let sub_title = format!(" {} [{}] ", s.inst2_title, sub_badge);
@@ -310,8 +368,8 @@ fn render_sandbox_inspector(frame: &mut Frame, area: Rect, app: &App) {
             Span::styled(format!(" [{}]", s.tag_isolated), Style::default().fg(COLOR_EMERALD).bold()),
         ]),
         Line::from(vec![
-            Span::styled(" APPDATA (R) : ", Style::default().fg(COLOR_SLATE_MUTED)),
-            Span::styled("...\\data\\instance_2\\AppData", Style::default().fg(Color::White)),
+            Span::styled(" APPDATA     : ", Style::default().fg(COLOR_SLATE_MUTED)),
+            Span::styled("...\\data\\instance_2\\AppData\\Roaming", Style::default().fg(Color::White)),
             Span::styled(format!(" [{}]", s.tag_isolated), Style::default().fg(COLOR_EMERALD).bold()),
         ]),
         Line::from(vec![
@@ -330,7 +388,7 @@ fn render_sandbox_inspector(frame: &mut Frame, area: Rect, app: &App) {
         ]),
     ];
 
-    let title = format!(" 📁 {} ", s.sandbox_title);
+    let title = format!(" {} ", s.sandbox_title);
     frame.render_widget(
         Paragraph::new(lines).block(
             Block::default()
@@ -379,7 +437,7 @@ fn render_logs(frame: &mut Frame, area: Rect, app: &App) {
         })
         .collect();
 
-    let title = format!(" 📋 {} [Live Stream] ", s.log_title);
+    let title = format!(" {} ", s.log_title);
     frame.render_widget(
         Paragraph::new(lines).block(
             Block::default()
@@ -396,28 +454,15 @@ fn render_logs(frame: &mut Frame, area: Rect, app: &App) {
 fn render_dock(frame: &mut Frame, area: Rect, app: &App) {
     let s = app.language.strings();
 
-    let dock_line = Line::from(vec![
-        Span::styled(" [Space] ", Style::default().fg(Color::White).bg(Color::Rgb(30, 41, 59)).bold()),
-        Span::styled(format!(" {} ", s.btn_space), Style::default().fg(COLOR_CYAN).bold()),
-        Span::styled("│", Style::default().fg(COLOR_BORDER_DEFAULT)),
-        Span::styled(" [K] ", Style::default().fg(COLOR_ROSE).bg(Color::Rgb(30, 41, 59)).bold()),
-        Span::styled(format!(" {} ", s.btn_kill), Style::default().fg(COLOR_ROSE)),
-        Span::styled("│", Style::default().fg(COLOR_BORDER_DEFAULT)),
-        Span::styled(" [R] ", Style::default().fg(COLOR_AMBER).bg(Color::Rgb(30, 41, 59)).bold()),
-        Span::styled(format!(" {} ", s.btn_restart), Style::default().fg(COLOR_AMBER)),
-        Span::styled("│", Style::default().fg(COLOR_BORDER_DEFAULT)),
-        Span::styled(" [C] ", Style::default().fg(COLOR_PURPLE).bg(Color::Rgb(30, 41, 59)).bold()),
-        Span::styled(format!(" {} ", s.btn_clear), Style::default().fg(COLOR_PURPLE)),
-        Span::styled("│", Style::default().fg(COLOR_BORDER_DEFAULT)),
-        Span::styled(" [O] ", Style::default().fg(COLOR_SLATE_MUTED).bg(Color::Rgb(30, 41, 59)).bold()),
-        Span::styled(format!(" {} ", s.btn_open), Style::default().fg(COLOR_SLATE_MUTED)),
-        Span::styled("│", Style::default().fg(COLOR_BORDER_DEFAULT)),
-        Span::styled(" [T] ", Style::default().fg(COLOR_INDIGO).bg(Color::Rgb(30, 41, 59)).bold()),
-        Span::styled(format!(" {} ", s.btn_lang), Style::default().fg(COLOR_INDIGO)),
-        Span::styled("│", Style::default().fg(COLOR_BORDER_DEFAULT)),
-        Span::styled(" [Q] ", Style::default().fg(COLOR_SLATE_DIM).bg(Color::Rgb(30, 41, 59)).bold()),
-        Span::styled(format!(" {} ", s.btn_quit), Style::default().fg(COLOR_SLATE_DIM)),
-    ]);
+    let items = [
+        ("Space", s.btn_space, COLOR_CYAN),
+        ("K", s.btn_kill, COLOR_ROSE),
+        ("R", s.btn_restart, COLOR_AMBER),
+        ("C", s.btn_clear, COLOR_PURPLE),
+        ("O", s.btn_open, COLOR_SLATE_MUTED),
+        ("T", s.btn_lang, COLOR_INDIGO),
+        ("Q", s.btn_quit, COLOR_SLATE_DIM),
+    ];
 
     let notice_text = if !app.toast_message.is_empty() {
         &app.toast_message
@@ -438,8 +483,17 @@ fn render_dock(frame: &mut Frame, area: Rect, app: &App) {
         Span::styled(notice_text, Style::default().fg(notice_color)),
     ]);
 
+    let lines = if area.width < 120 {
+        vec![
+            make_dock_line(&items[..4]),
+            make_dock_line(&items[4..]),
+        ]
+    } else {
+        vec![make_dock_line(&items)]
+    };
+
     frame.render_widget(
-        Paragraph::new(dock_line).block(
+        Paragraph::new(lines).block(
             Block::default()
                 .title(title_line)
                 .borders(Borders::ALL)
@@ -449,6 +503,24 @@ fn render_dock(frame: &mut Frame, area: Rect, app: &App) {
         ),
         area,
     );
+}
+
+fn make_dock_line(items: &[(&str, &str, Color)]) -> Line<'static> {
+    let mut spans = Vec::new();
+    for (index, (key, label, color)) in items.iter().enumerate() {
+        if index > 0 {
+            spans.push(Span::styled(" │ ", Style::default().fg(COLOR_BORDER_DEFAULT)));
+        }
+        spans.push(Span::styled(
+            format!(" [{}] ", key),
+            Style::default().fg(Color::White).bg(Color::Rgb(30, 41, 59)).bold(),
+        ));
+        spans.push(Span::styled(
+            format!(" {} ", label),
+            Style::default().fg(*color).bold(),
+        ));
+    }
+    Line::from(spans)
 }
 
 fn make_mini_bar(current: f64, max: f64, width: usize) -> String {
