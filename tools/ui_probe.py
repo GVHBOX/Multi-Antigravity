@@ -7,6 +7,7 @@
     python tools/ui_probe.py launch                 # 起临时实例并打印 PID
     python tools/ui_probe.py rect <pid>             # 窗口尺寸 + DPI
     python tools/ui_probe.py max <pid>              # 最大化（验证超宽屏布局）
+    python tools/ui_probe.py size <pid> <w> <h>     # 改成指定窗口尺寸（含边框）
     python tools/ui_probe.py shot <pid> [scale] [name] [x,y,w,h]
     python tools/ui_probe.py key <pid> <vk-16进制> [次数]
     python tools/ui_probe.py kill <pid>
@@ -179,6 +180,18 @@ def cmd_max(pid):
     return cmd_rect(pid)
 
 
+def cmd_size(pid, w, h):
+    got = find_window(pid)
+    if not got:
+        print("window not found")
+        return 1
+    hwnd, _rect = got
+    SWP_NOMOVE, SWP_NOZORDER = 0x0002, 0x0004
+    user32.SetWindowPos(hwnd, 0, 0, 0, w, h, SWP_NOMOVE | SWP_NOZORDER)
+    time.sleep(1.0)
+    return cmd_rect(pid)
+
+
 def cmd_key(pid, vk, times):
     got = find_window(pid)
     if not got:
@@ -214,6 +227,8 @@ def main(argv):
             crop = tuple(int(v) for v in argv[4].split(","))
         return cmd_shot(int(argv[1]), int(argv[2]) if len(argv) > 2 else 2,
                         argv[3] if len(argv) > 3 else "ui-shot.png", crop)
+    if cmd == "size" and len(argv) >= 4:
+        return cmd_size(int(argv[1]), int(argv[2]), int(argv[3]))
     if cmd == "max" and len(argv) >= 2:
         return cmd_max(int(argv[1]))
     if cmd == "key" and len(argv) >= 3:
