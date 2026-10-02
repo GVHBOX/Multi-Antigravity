@@ -214,12 +214,11 @@ export component MainWindow inherits Window {
     }
 
     VerticalLayout {
-        width: min(parent.width, 1920px);
-        x: (parent.width - self.width) / 2;
+        width: min(parent.width, 99999px);
         padding-top: 24px;
         padding-bottom: 24px;
-        padding-left: 28px;
-        padding-right: 28px;
+        padding-left: 48px;
+        padding-right: 48px;
         spacing: 16px;
 
         Rectangle {
@@ -230,10 +229,10 @@ export component MainWindow inherits Window {
             height: 64px;
 
             HorizontalLayout {
-                padding-left: 22px;
-                padding-right: 22px;
+                padding-left: 32px;
+                padding-right: 32px;
                 spacing: 16px;
-                alignment: start;
+                alignment: space-between;
 
                 HorizontalLayout {
                     spacing: 10px;
@@ -271,6 +270,40 @@ export component MainWindow inherits Window {
                         }
                     }
                 }
+
+            HorizontalLayout {
+                spacing: 8px;
+                alignment: end;
+            StatusPill {
+                text: root.kernel_status;
+                pill_color: #34d399;
+                show_dot: true;
+            }
+            StatusPill {
+                text: root.ram_overhead;
+                pill_color: #38bdf8;
+                show_dot: false;
+            }
+            Rectangle {
+                background: rgba(56, 189, 248, 0.08);
+                border-color: rgba(56, 189, 248, 0.22);
+                border-width: 1px;
+                border-radius: 8px;
+                height: 34px;
+                HorizontalLayout {
+                    padding-left: 14px;
+                    padding-right: 14px;
+                    alignment: center;
+                    Text {
+                        text: root.current_time;
+                        color: #38bdf8;
+                        font-size: 20px;
+                        font-weight: 700;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+            }
 
             }
         }
@@ -693,42 +726,4 @@ export component MainWindow inherits Window {
         }
     }
 
-    HorizontalLayout {
-        x: parent.width - self.width - 50px;
-        y: 39px;
-        spacing: 8px;
-        alignment: end;
-
-        StatusPill {
-            text: root.kernel_status;
-            pill_color: #34d399;
-            show_dot: true;
-        }
-
-        StatusPill {
-            text: root.ram_overhead;
-            pill_color: #38bdf8;
-            show_dot: false;
-        }
-
-        Rectangle {
-            background: rgba(56, 189, 248, 0.08);
-            border-color: rgba(56, 189, 248, 0.22);
-            border-width: 1px;
-            border-radius: 8px;
-            height: 34px;
-            HorizontalLayout {
-                padding-left: 14px;
-                padding-right: 14px;
-                alignment: center;
-                Text {
-                    text: root.current_time;
-                    color: #38bdf8;
-                    font-size: 20px;
-                    font-weight: 700;
-                    vertical-alignment: center;
-                }
-            }
-        }
-    }
 }
