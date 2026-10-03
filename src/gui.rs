@@ -576,11 +576,11 @@ fn show_cockpit_from_tray(ui_weak: &slint::Weak<MainWindow>) {
                     ui.set_proxy_status("已接入 (7890)".into());
                     ui.set_proxy_color(slint::Color::from_rgb_u8(52, 211, 153));
                 } else {
-                    ui.set_proxy_status("已接入(端口未开)".into());
+                    ui.set_proxy_status("端口未开 (7890)".into());
                     ui.set_proxy_color(slint::Color::from_rgb_u8(245, 158, 11));
                 }
                 ui.set_proxy_btn_text("断开系统代理".into());
-                ui.set_proxy_btn_color(slint::Color::from_rgb_u8(56, 189, 248));
+                ui.set_proxy_btn_color(slint::Color::from_rgb_u8(148, 163, 184));
             } else if p_status.is_any_deployed() {
                 ui.set_proxy_status("部分接入".into());
                 ui.set_proxy_color(slint::Color::from_rgb_u8(245, 158, 11));
@@ -623,10 +623,10 @@ fn show_cockpit_from_tray(ui_weak: &slint::Weak<MainWindow>) {
 
         let initial_proxy = crate::proxy::ProxyManager::check_status();
         if initial_proxy.is_fully_deployed() {
-            main_window.set_proxy_status(if initial_proxy.port_online { "已接入 (7890)".into() } else { "已接入(端口未开)".into() });
+            main_window.set_proxy_status(if initial_proxy.port_online { "已接入 (7890)".into() } else { "端口未开 (7890)".into() });
             main_window.set_proxy_color(if initial_proxy.port_online { slint::Color::from_rgb_u8(52, 211, 153) } else { slint::Color::from_rgb_u8(245, 158, 11) });
             main_window.set_proxy_btn_text("断开系统代理".into());
-            main_window.set_proxy_btn_color(slint::Color::from_rgb_u8(56, 189, 248));
+            main_window.set_proxy_btn_color(slint::Color::from_rgb_u8(148, 163, 184));
             append_log(&main_window, "PROXY", &format!("系统代理已接入 (本地 7890 端口: {})", if initial_proxy.port_online { "在线" } else { "未检测到监听" }));
         } else {
             main_window.set_proxy_status("未接入".into());
