@@ -28,7 +28,7 @@ impl StreamSource {
         match self {
             Self::LanguageServer => "核心流: 主机服务 (Host-LS)",
             Self::SubLanguageServer => "分身流: 隔离服务 (Sub-LS)",
-            Self::ProxyLog => "网络流: 免TUN代理 (Proxy)",
+            Self::ProxyLog => "网络流: 系统代理 (Proxy)",
             Self::CockpitSystem => "座舱流: 系统调度 (System)",
             Self::MainApp => "主程序: 应用更新 (Main)",
         }

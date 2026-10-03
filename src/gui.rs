@@ -423,11 +423,11 @@ fn show_cockpit_from_tray(ui_weak: &slint::Weak<MainWindow>) {
                 if status.is_any_deployed() {
                     match crate::proxy::ProxyManager::remove_all() {
                         Ok(msg) => {
-                            ui.set_toast_message("已移除免 TUN 代理".into());
+                            ui.set_toast_message("已断开系统代理".into());
                             append_log(&ui, "PROXY", &msg);
                         }
                         Err(e) => {
-                            let err = format!("移除失败: {}", e);
+                            let err = format!("断开失败: {}", e);
                             ui.set_toast_message(err.clone().into());
                             append_log(&ui, "ERROR", &err);
                         }
@@ -435,10 +435,10 @@ fn show_cockpit_from_tray(ui_weak: &slint::Weak<MainWindow>) {
                 } else {
                     match crate::proxy::ProxyManager::deploy_all() {
                         Ok(msg) => {
-                            ui.set_toast_message("免 TUN 代理已部署就绪".into());
+                            ui.set_toast_message("系统代理已接入".into());
                             append_log(&ui, "PROXY", &msg);
                             if !status.port_online {
-                                append_log(&ui, "WARN", "本地 7890 端口未监听。");
+                                append_log(&ui, "WARN", "本地 7890 端口未监听");
                             }
                         }
                         Err(e) => {
@@ -573,24 +573,24 @@ fn show_cockpit_from_tray(ui_weak: &slint::Weak<MainWindow>) {
             let p_status = crate::proxy::ProxyManager::check_status();
             if p_status.is_fully_deployed() {
                 if p_status.port_online {
-                    ui.set_proxy_status("免TUN代理就绪 (7890)".into());
-                    ui.set_proxy_color(slint::Color::from_rgb_u8(16, 185, 129));
+                    ui.set_proxy_status("已接入 (7890)".into());
+                    ui.set_proxy_color(slint::Color::from_rgb_u8(52, 211, 153));
                 } else {
-                    ui.set_proxy_status("代理已就绪(端口未开)".into());
+                    ui.set_proxy_status("已接入(端口未开)".into());
                     ui.set_proxy_color(slint::Color::from_rgb_u8(245, 158, 11));
                 }
-                ui.set_proxy_btn_text("移除免TUN代理".into());
-                ui.set_proxy_btn_color(slint::Color::from_rgb_u8(244, 63, 94));
+                ui.set_proxy_btn_text("断开系统代理".into());
+                ui.set_proxy_btn_color(slint::Color::from_rgb_u8(56, 189, 248));
             } else if p_status.is_any_deployed() {
-                ui.set_proxy_status("代理部分就绪".into());
+                ui.set_proxy_status("部分接入".into());
                 ui.set_proxy_color(slint::Color::from_rgb_u8(245, 158, 11));
-                ui.set_proxy_btn_text("重新部署代理".into());
-                ui.set_proxy_btn_color(slint::Color::from_rgb_u8(251, 191, 36));
+                ui.set_proxy_btn_text("重新接入代理".into());
+                ui.set_proxy_btn_color(slint::Color::from_rgb_u8(56, 189, 248));
             } else {
-                ui.set_proxy_status("未部署免TUN代理".into());
+                ui.set_proxy_status("未接入".into());
                 ui.set_proxy_color(slint::Color::from_rgb_u8(100, 116, 139));
-                ui.set_proxy_btn_text("部署免TUN代理".into());
-                ui.set_proxy_btn_color(slint::Color::from_rgb_u8(16, 185, 129));
+                ui.set_proxy_btn_text("接入系统代理".into());
+                ui.set_proxy_btn_color(slint::Color::from_rgb_u8(56, 189, 248));
             }
         }
     });
@@ -623,17 +623,17 @@ fn show_cockpit_from_tray(ui_weak: &slint::Weak<MainWindow>) {
 
         let initial_proxy = crate::proxy::ProxyManager::check_status();
         if initial_proxy.is_fully_deployed() {
-            main_window.set_proxy_status(if initial_proxy.port_online { "免TUN代理就绪 (7890)".into() } else { "代理已就绪(端口未开)".into() });
-            main_window.set_proxy_color(if initial_proxy.port_online { slint::Color::from_rgb_u8(16, 185, 129) } else { slint::Color::from_rgb_u8(245, 158, 11) });
-            main_window.set_proxy_btn_text("移除免TUN代理".into());
-            main_window.set_proxy_btn_color(slint::Color::from_rgb_u8(244, 63, 94));
-            append_log(&main_window, "PROXY", &format!("免 TUN 代理已就绪 (本地 7890 端口: {})", if initial_proxy.port_online { "在线" } else { "未检测到监听" }));
+            main_window.set_proxy_status(if initial_proxy.port_online { "已接入 (7890)".into() } else { "已接入(端口未开)".into() });
+            main_window.set_proxy_color(if initial_proxy.port_online { slint::Color::from_rgb_u8(52, 211, 153) } else { slint::Color::from_rgb_u8(245, 158, 11) });
+            main_window.set_proxy_btn_text("断开系统代理".into());
+            main_window.set_proxy_btn_color(slint::Color::from_rgb_u8(56, 189, 248));
+            append_log(&main_window, "PROXY", &format!("系统代理已接入 (本地 7890 端口: {})", if initial_proxy.port_online { "在线" } else { "未检测到监听" }));
         } else {
-            main_window.set_proxy_status("未部署免TUN代理".into());
+            main_window.set_proxy_status("未接入".into());
             main_window.set_proxy_color(slint::Color::from_rgb_u8(100, 116, 139));
-            main_window.set_proxy_btn_text("部署免TUN代理".into());
-            main_window.set_proxy_btn_color(slint::Color::from_rgb_u8(16, 185, 129));
-            append_log(&main_window, "PROXY", "免 TUN 代理: 未部署");
+            main_window.set_proxy_btn_text("接入系统代理".into());
+            main_window.set_proxy_btn_color(slint::Color::from_rgb_u8(56, 189, 248));
+            append_log(&main_window, "PROXY", "系统代理: 未接入");
         }
     }
 

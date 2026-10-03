@@ -281,10 +281,10 @@ export component MainWindow inherits Window {
     in property <string> toast_message: "座舱已就绪";
     in property <bool> token_present: false;
 
-    in property <string> proxy_status: "未部署代理";
+    in property <string> proxy_status: "未接入";
     in property <color> proxy_color: #64748b;
-    in property <string> proxy_btn_text: "部署代理";
-    in property <color> proxy_btn_color: #34d399;
+    in property <string> proxy_btn_text: "接入系统代理";
+    in property <color> proxy_btn_color: #38bdf8;
 
     in property <string> stream_source_name: "核心流: 主机语言服务 (Host-LS)";
     in property <[LogLineData]> log_lines: [];
@@ -888,7 +888,7 @@ export component MainWindow inherits Window {
 
                             HorizontalLayout {
                                 alignment: space-between;
-                                Text { text: "免 TUN 代理"; color: #cbd5e1; font-size: 13px; font-weight: 600; vertical-alignment: center; }
+                                Text { text: "系统代理"; color: #cbd5e1; font-size: 13px; font-weight: 600; vertical-alignment: center; }
                                 StatusPill { text: root.proxy_status; pill_color: root.proxy_color; show_dot: true; height: 22px; }
                             }
 
@@ -896,8 +896,8 @@ export component MainWindow inherits Window {
                                 alignment: space-between;
                                 Text { text: "本地端口: 7890"; color: #64748b; font-size: 12px; font-family: "Cascadia Mono"; vertical-alignment: center; }
                                 Rectangle {
-                                    background: root.proxy_btn_color.transparentize(85%);
-                                    border-color: root.proxy_btn_color.transparentize(50%);
+                                    background: ta_proxy.has_hover ? #1e293b : #131b2b;
+                                    border-color: ta_proxy.has_hover ? #38bdf8 : #27354f;
                                     border-width: 1px;
                                     border-radius: 5px;
                                     height: 24px;
@@ -910,8 +910,8 @@ export component MainWindow inherits Window {
                                         padding-right: 8px;
                                         spacing: 5px;
                                         alignment: center;
-                                        Text { text: "P"; color: root.proxy_btn_color; font-size: 11px; font-weight: 700; vertical-alignment: center; }
-                                        Text { text: root.proxy_btn_text; color: root.proxy_btn_color; font-size: 11px; font-weight: 600; vertical-alignment: center; }
+                                        Text { text: "P"; color: #38bdf8; font-size: 11px; font-weight: 700; vertical-alignment: center; }
+                                        Text { text: root.proxy_btn_text; color: #cbd5e1; font-size: 11px; font-weight: 600; vertical-alignment: center; }
                                     }
                                 }
                             }
@@ -953,7 +953,7 @@ export component MainWindow inherits Window {
                             }
                             LogTab {
                                 icon: "🌐";
-                                title: "免TUN代理";
+                                title: "系统代理";
                                 is_active: root.current_stream_idx == 2;
                                 clicked => { root.select_stream_source(2); }
                             }
@@ -1199,8 +1199,8 @@ export component MainWindow inherits Window {
                 KeyButton {
                     key_label: "P";
                     action_label: root.proxy_btn_text;
-                    accent_color: root.proxy_btn_color;
-                    is_accented: true;
+                    accent_color: #38bdf8;
+                    is_accented: false;
                     clicked => { root.action_proxy(); }
                 }
 
