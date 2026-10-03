@@ -86,7 +86,7 @@ impl App {
     }
 
     pub fn refresh(&mut self) {
-        self.monitor.refresh(self.sub_known_pid);
+        self.monitor.refresh_single(self.sub_known_pid);
 
         if let Some(pid) = self.monitor.sub.electron_pid {
             self.sub_known_pid = Some(pid);
@@ -197,13 +197,13 @@ impl App {
             Ok(cleared) => {
                 let msg = if cleared {
                     if self.language == Language::Zh {
-                        "已清除独立凭据。"
+                        "已退出分身登录状态。"
                     } else {
-                        "OAuth token file cleared! Next login will prompt Google account selection."
+                        "Account logged out. Next login will prompt Google account selection."
                     }
                 } else {
                     if self.language == Language::Zh {
-                        "当前已处于未登录状态，无需清除。"
+                        "分身未处于登录状态。"
                     } else {
                         "Sub-instance is already in unauthenticated state."
                     }
@@ -212,7 +212,7 @@ impl App {
                 self.set_toast(msg, false);
             }
             Err(e) => {
-                let err_msg = format!("清除凭据失败: {}", e);
+                let err_msg = format!("退出账号失败: {}", e);
                 self.add_log("AUTH", &err_msg);
                 self.set_toast(err_msg, true);
             }
@@ -223,11 +223,11 @@ impl App {
         match self.config.open_sandbox_in_explorer() {
             Ok(_) => {
                 let msg = if self.language == Language::Zh {
-                    "已在 Windows 资源管理器中打开独立沙箱目录。"
+                    "已在 Windows 资源管理器中打开数据目录。"
                 } else {
-                    "Opened sandbox directory in Windows Explorer."
+                    "Opened data directory in Windows Explorer."
                 };
-                self.add_log("SANDBOX", msg);
+                self.add_log("DATA", msg);
                 self.set_toast(msg, false);
             }
             Err(e) => {
@@ -272,11 +272,11 @@ impl App {
 
     fn init_logs(&mut self) {
         if self.language == Language::Zh {
-            self.add_log("SYSTEM", "座舱就绪。");
-            self.add_log("SANDBOX", "沙箱路径: data/instance_2");
+            self.add_log("SYSTEM", "管理程序就绪。");
+            self.add_log("DATA", "数据目录: data/instance_2");
         } else {
-            self.add_log("SYSTEM", "Cockpit ready.");
-            self.add_log("SANDBOX", "Sandbox path: data/instance_2");
+            self.add_log("SYSTEM", "Manager ready.");
+            self.add_log("DATA", "Data directory: data/instance_2");
         }
     }
 }

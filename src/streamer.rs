@@ -16,21 +16,21 @@ pub enum StreamSource {
 impl StreamSource {
     pub fn next(&self) -> Self {
         match self {
+            Self::CockpitSystem => Self::LanguageServer,
             Self::LanguageServer => Self::SubLanguageServer,
             Self::SubLanguageServer => Self::ProxyLog,
-            Self::ProxyLog => Self::CockpitSystem,
-            Self::CockpitSystem => Self::MainApp,
-            Self::MainApp => Self::LanguageServer,
+            Self::ProxyLog => Self::MainApp,
+            Self::MainApp => Self::CockpitSystem,
         }
     }
 
     pub fn display_name(&self) -> &'static str {
         match self {
-            Self::LanguageServer => "核心流: 主机服务 (Host-LS)",
-            Self::SubLanguageServer => "分身流: 隔离服务 (Sub-LS)",
-            Self::ProxyLog => "网络流: 代理注入 (Proxy)",
-            Self::CockpitSystem => "座舱流: 系统调度 (System)",
-            Self::MainApp => "主程序: 应用更新 (Main)",
+            Self::CockpitSystem => "运行记录",
+            Self::LanguageServer => "主号日志",
+            Self::SubLanguageServer => "分身日志",
+            Self::ProxyLog => "代理日志",
+            Self::MainApp => "客户端日志",
         }
     }
 }
@@ -60,7 +60,7 @@ pub struct LogStreamer {
 impl LogStreamer {
     pub fn new() -> Self {
         let mut streamer = Self {
-            current_source: StreamSource::LanguageServer,
+            current_source: StreamSource::CockpitSystem,
             last_offset: 0,
             last_path: None,
             buffer: VecDeque::with_capacity(300),
@@ -84,20 +84,20 @@ impl LogStreamer {
 
     pub fn get_source_index(&self) -> i32 {
         match self.current_source {
-            StreamSource::LanguageServer => 0,
-            StreamSource::SubLanguageServer => 1,
-            StreamSource::ProxyLog => 2,
-            StreamSource::CockpitSystem => 3,
+            StreamSource::CockpitSystem => 0,
+            StreamSource::LanguageServer => 1,
+            StreamSource::SubLanguageServer => 2,
+            StreamSource::ProxyLog => 3,
             StreamSource::MainApp => 4,
         }
     }
 
     pub fn from_source_index(idx: i32) -> StreamSource {
         match idx {
-            0 => StreamSource::LanguageServer,
-            1 => StreamSource::SubLanguageServer,
-            2 => StreamSource::ProxyLog,
-            3 => StreamSource::CockpitSystem,
+            0 => StreamSource::CockpitSystem,
+            1 => StreamSource::LanguageServer,
+            2 => StreamSource::SubLanguageServer,
+            3 => StreamSource::ProxyLog,
             _ => StreamSource::MainApp,
         }
     }

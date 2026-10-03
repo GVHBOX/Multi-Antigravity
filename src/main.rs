@@ -58,14 +58,14 @@ fn acquire_single_instance() -> Result<Option<SingleInstanceGuard>> {
         .collect();
     let activation_event = unsafe { CreateEventW(null(), 0, 0, event_name.as_ptr()) };
     if activation_event.is_null() {
-        return Err(anyhow!("无法创建座舱激活事件"));
+        return Err(anyhow!("无法创建激活事件"));
     }
     let mutex = unsafe { CreateMutexW(null(), 1, mutex_name.as_ptr()) };
     if mutex.is_null() {
         unsafe {
             windows_sys::Win32::Foundation::CloseHandle(activation_event);
         }
-        return Err(anyhow!("无法创建座舱单实例锁"));
+        return Err(anyhow!("无法创建单实例互斥锁"));
     }
     if unsafe { GetLastError() } == ERROR_ALREADY_EXISTS {
         unsafe {

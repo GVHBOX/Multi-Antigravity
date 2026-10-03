@@ -58,6 +58,10 @@ class BITMAPINFOHEADER(ctypes.Structure):
 
 
 def find_window(pid, min_width=200):
+    access = 0x0040 | 0x0001 | 0x0100
+    hDesk = user32.OpenInputDesktop(0, False, access) or user32.OpenDesktopW("default", 0, False, access)
+    if hDesk:
+        user32.SetThreadDesktop(hDesk)
     found = []
 
     @ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
@@ -72,7 +76,10 @@ def find_window(pid, min_width=200):
                 return False
         return True
 
-    user32.EnumWindows(cb, 0)
+    if hDesk:
+        user32.EnumDesktopWindows(hDesk, cb, 0)
+    else:
+        user32.EnumWindows(cb, 0)
     return found[0] if found else None
 
 
@@ -137,7 +144,7 @@ def cmd_launch():
     if not EXE.exists():
         print("先 cargo build --release")
         return 1
-    proc = subprocess.Popen([str(EXE)], cwd=str(ROOT))
+    proc = subprocess.Popen([str(EXE)], cwd=str(ROOT), creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP)
     print(proc.pid)
     return 0
 

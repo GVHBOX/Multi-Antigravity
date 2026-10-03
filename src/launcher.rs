@@ -8,6 +8,7 @@ use std::process::Command;
 const WIN32_DETACHED_FLAGS: u32 = 0x01000208;
 
 pub struct LauncherConfig {
+    pub slot: usize,
     pub executable_path: PathBuf,
     pub sandbox_root: PathBuf,
     pub home_dir: PathBuf,
@@ -17,8 +18,13 @@ pub struct LauncherConfig {
 
 impl LauncherConfig {
     pub fn new() -> Result<Self> {
+        Self::for_slot(1)
+    }
+
+    pub fn for_slot(slot: usize) -> Result<Self> {
         let base_dir = Self::resolve_base_dir()?;
-        let sandbox_root = base_dir.join("data").join("instance_2");
+        let instance_name = format!("instance_{}", slot + 1);
+        let sandbox_root = base_dir.join("data").join(instance_name);
         let home_dir = sandbox_root.join("home");
         let roaming_dir = sandbox_root.join("AppData").join("Roaming");
         let token_path = home_dir.join(".gemini").join("jetski-standalone-oauth-token");
@@ -30,6 +36,7 @@ impl LauncherConfig {
             .join("Antigravity.exe");
 
         Ok(Self {
+            slot,
             executable_path,
             sandbox_root,
             home_dir,
@@ -65,6 +72,30 @@ impl LauncherConfig {
             .with_context(|| format!("Failed to create home dir: {:?}", self.home_dir))?;
         fs::create_dir_all(self.roaming_dir.join("Antigravity"))
             .with_context(|| format!("Failed to create roaming dir: {:?}", self.roaming_dir))?;
+
+        let sandbox_config = self.home_dir.join(".gemini").join("config");
+        let _ = fs::create_dir_all(&sandbox_config);
+
+        if let Ok(real_user) = env::var("USERPROFILE") {
+            let host_skills = PathBuf::from(&real_user).join(".gemini").join("config").join("skills");
+            let sub_skills = sandbox_config.join("skills");
+            if host_skills.exists() && !sub_skills.exists() {
+                let _ = Command::new("cmd")
+                    .args(["/c", "mklink", "/J", &sub_skills.to_string_lossy(), &host_skills.to_string_lossy()])
+                    .creation_flags(WIN32_DETACHED_FLAGS)
+                    .output();
+            }
+
+            let host_rules = PathBuf::from(&real_user).join(".gemini").join("config").join("rules");
+            let sub_rules = sandbox_config.join("rules");
+            if host_rules.exists() && !sub_rules.exists() {
+                let _ = Command::new("cmd")
+                    .args(["/c", "mklink", "/J", &sub_rules.to_string_lossy(), &host_rules.to_string_lossy()])
+                    .creation_flags(WIN32_DETACHED_FLAGS)
+                    .output();
+            }
+        }
+
         Ok(())
     }
 
@@ -111,7 +142,8 @@ impl LauncherConfig {
         cmd.env("HOME", &self.home_dir);
         cmd.env("APPDATA", &self.roaming_dir);
 
-        cmd.env("SSH_CONNECTION", "127.0.0.1 50000 127.0.0.1 22");
+        let ssh_port = 50000 + self.slot as u32;
+        cmd.env("SSH_CONNECTION", format!("127.0.0.1 {} 127.0.0.1 22", ssh_port));
 
         if let Ok(real_local) = env::var("LOCALAPPDATA") {
             cmd.env("LOCALAPPDATA", real_local);

@@ -1,5 +1,6 @@
 use sysinfo::{ProcessesToUpdate, System};
 
+#[derive(Clone)]
 pub struct ProcessStats {
     pub is_running: bool,
     pub electron_pid: Option<u32>,
@@ -26,34 +27,46 @@ pub struct TelemetryMonitor {
     sys: System,
     pub host: ProcessStats,
     pub sub: ProcessStats,
+    pub subs: [ProcessStats; 3],
     pub total_memory_mb: f64,
+    pub system_total_ram_mb: f64,
     cached_host_ls_pid: Option<u32>,
     cached_host_port: Option<u16>,
     host_port_retry_count: u32,
-    cached_sub_ls_pid: Option<u32>,
-    cached_sub_port: Option<u16>,
-    sub_port_retry_count: u32,
+    cached_sub_ls_pids: [Option<u32>; 3],
+    cached_sub_ports: [Option<u16>; 3],
+    sub_port_retry_counts: [u32; 3],
 }
 
 impl TelemetryMonitor {
     pub fn new() -> Self {
         let mut sys = System::new();
+        sys.refresh_memory();
         sys.refresh_processes(ProcessesToUpdate::All, true);
+        let total_ram = (sys.total_memory() as f64) / (1024.0 * 1024.0);
+        let system_total_ram_mb = if total_ram > 0.0 { total_ram } else { 32768.0 };
         Self {
             sys,
             host: ProcessStats::default(),
             sub: ProcessStats::default(),
+            subs: [ProcessStats::default(), ProcessStats::default(), ProcessStats::default()],
             total_memory_mb: 0.0,
+            system_total_ram_mb,
             cached_host_ls_pid: None,
             cached_host_port: None,
             host_port_retry_count: 0,
-            cached_sub_ls_pid: None,
-            cached_sub_port: None,
-            sub_port_retry_count: 0,
+            cached_sub_ls_pids: [None; 3],
+            cached_sub_ports: [None; 3],
+            sub_port_retry_counts: [0; 3],
         }
     }
 
-    pub fn refresh(&mut self, known_sub_pid: Option<u32>) {
+    pub fn refresh_single(&mut self, known_sub_pid: Option<u32>) {
+        self.refresh([known_sub_pid, None, None]);
+    }
+
+    pub fn refresh(&mut self, known_sub_pids: [Option<u32>; 3]) {
+        self.sys.refresh_memory();
         self.sys.refresh_processes(ProcessesToUpdate::All, true);
 
         let mut host_electron_pid = None;
@@ -61,10 +74,10 @@ impl TelemetryMonitor {
         let mut host_cpu = 0.0;
         let mut host_mem_bytes = 0u64;
 
-        let mut sub_electron_pid = None;
-        let mut sub_ls_pid = None;
-        let mut sub_cpu = 0.0;
-        let mut sub_mem_bytes = 0u64;
+        let mut sub_electron_pids = [None, None, None];
+        let mut sub_ls_pids = [None, None, None];
+        let mut sub_cpus = [0.0f32, 0.0f32, 0.0f32];
+        let mut sub_mem_bytes = [0u64, 0u64, 0u64];
 
         let self_pid = std::process::id();
 
@@ -88,20 +101,28 @@ impl TelemetryMonitor {
                 .collect::<Vec<_>>()
                 .join(" ");
 
-            let is_sub = cmd_line.contains("instance_2")
-                || known_sub_pid == Some(pid_u32)
-                || (proc.parent().map(|p| p.as_u32()) == known_sub_pid && known_sub_pid.is_some());
+            let mut matched_slot = None;
+            for slot in 0..3 {
+                let tag = format!("instance_{}", slot + 2);
+                if cmd_line.contains(&tag)
+                    || known_sub_pids[slot] == Some(pid_u32)
+                    || (proc.parent().map(|p| p.as_u32()) == known_sub_pids[slot] && known_sub_pids[slot].is_some())
+                {
+                    matched_slot = Some(slot);
+                    break;
+                }
+            }
 
             let is_main_electron = is_antigravity && !cmd_line.contains("--type=");
 
-            if is_sub {
-                if is_main_electron || (is_antigravity && sub_electron_pid.is_none()) {
-                    sub_electron_pid = Some(pid_u32);
-                } else if is_ls && sub_ls_pid.is_none() {
-                    sub_ls_pid = Some(pid_u32);
+            if let Some(slot) = matched_slot {
+                if is_main_electron || (is_antigravity && sub_electron_pids[slot].is_none()) {
+                    sub_electron_pids[slot] = Some(pid_u32);
+                } else if is_ls && sub_ls_pids[slot].is_none() {
+                    sub_ls_pids[slot] = Some(pid_u32);
                 }
-                sub_cpu += proc.cpu_usage();
-                sub_mem_bytes += proc.memory();
+                sub_cpus[slot] += proc.cpu_usage();
+                sub_mem_bytes[slot] += proc.memory();
             } else {
                 if is_main_electron || (is_antigravity && host_electron_pid.is_none()) {
                     host_electron_pid = Some(pid_u32);
@@ -131,24 +152,26 @@ impl TelemetryMonitor {
             self.host_port_retry_count = 0;
         }
 
-        if sub_ls_pid != self.cached_sub_ls_pid {
-            self.cached_sub_ls_pid = sub_ls_pid;
-            self.cached_sub_port = None;
-            self.sub_port_retry_count = 0;
-        }
-
-        if let Some(pid) = sub_ls_pid {
-            if self.cached_sub_port.is_none() {
-                self.sub_port_retry_count = self.sub_port_retry_count.wrapping_add(1);
-                if self.sub_port_retry_count <= 10 || self.sub_port_retry_count % 5 == 0 {
-                    self.cached_sub_port = detect_listening_port(pid);
-                }
+        for slot in 0..3 {
+            let ls_pid = sub_ls_pids[slot];
+            if ls_pid != self.cached_sub_ls_pids[slot] {
+                self.cached_sub_ls_pids[slot] = ls_pid;
+                self.cached_sub_ports[slot] = None;
+                self.sub_port_retry_counts[slot] = 0;
             }
-        } else {
-            self.cached_sub_port = None;
-            self.sub_port_retry_count = 0;
-        }
 
+            if let Some(pid) = ls_pid {
+                if self.cached_sub_ports[slot].is_none() {
+                    self.sub_port_retry_counts[slot] = self.sub_port_retry_counts[slot].wrapping_add(1);
+                    if self.sub_port_retry_counts[slot] <= 10 || self.sub_port_retry_counts[slot] % 5 == 0 {
+                        self.cached_sub_ports[slot] = detect_listening_port(pid);
+                    }
+                }
+            } else {
+                self.cached_sub_ports[slot] = None;
+                self.sub_port_retry_counts[slot] = 0;
+            }
+        }
 
         let num_cpus = std::thread::available_parallelism()
             .map(|n| n.get())
@@ -164,16 +187,26 @@ impl TelemetryMonitor {
             ls_port: self.cached_host_port,
         };
 
-        self.sub = ProcessStats {
-            is_running: sub_electron_pid.is_some(),
-            electron_pid: sub_electron_pid,
-            ls_pid: sub_ls_pid,
-            cpu_usage: (sub_cpu / num_cpus).min(100.0),
-            memory_rss_mb: (sub_mem_bytes as f64) / (1024.0 * 1024.0),
-            ls_port: self.cached_sub_port,
-        };
+        for slot in 0..3 {
+            self.subs[slot] = ProcessStats {
+                is_running: sub_electron_pids[slot].is_some(),
+                electron_pid: sub_electron_pids[slot],
+                ls_pid: sub_ls_pids[slot],
+                cpu_usage: (sub_cpus[slot] / num_cpus).min(100.0),
+                memory_rss_mb: (sub_mem_bytes[slot] as f64) / (1024.0 * 1024.0),
+                ls_port: self.cached_sub_ports[slot],
+            };
+        }
 
-        self.total_memory_mb = self.host.memory_rss_mb + self.sub.memory_rss_mb;
+        self.sub = self.subs[0].clone();
+        self.total_memory_mb = self.host.memory_rss_mb
+            + self.subs[0].memory_rss_mb
+            + self.subs[1].memory_rss_mb
+            + self.subs[2].memory_rss_mb;
+        let total_ram = (self.sys.total_memory() as f64) / (1024.0 * 1024.0);
+        if total_ram > 0.0 {
+            self.system_total_ram_mb = total_ram;
+        }
     }
 }
 

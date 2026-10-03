@@ -270,7 +270,7 @@ fn render_dual_instances(frame: &mut Frame, area: Rect, app: &App) {
             Span::styled("  │  ", Style::default().fg(COLOR_BORDER_DEFAULT)),
             Span::styled(format!("{}: ", s.lbl_mem_rss), Style::default().fg(COLOR_SLATE_MUTED)),
             Span::styled(format!("{:.1} MB ", host.memory_rss_mb), Style::default().fg(Color::White).bold()),
-            Span::styled(make_mini_bar(host.memory_rss_mb, 1024.0, 8), Style::default().fg(COLOR_INDIGO)),
+            Span::styled(make_mini_bar(host.memory_rss_mb, app.monitor.system_total_ram_mb.max(1024.0), 8), Style::default().fg(COLOR_INDIGO)),
         ]));
     }
 
@@ -336,7 +336,7 @@ fn render_dual_instances(frame: &mut Frame, area: Rect, app: &App) {
             Span::styled("  │  ", Style::default().fg(COLOR_BORDER_DEFAULT)),
             Span::styled(format!("{}: ", s.lbl_mem_rss), Style::default().fg(COLOR_SLATE_MUTED)),
             Span::styled(format!("{:.1} MB ", sub.memory_rss_mb), Style::default().fg(Color::White).bold()),
-            Span::styled(make_mini_bar(sub.memory_rss_mb, 1024.0, 8), Style::default().fg(COLOR_CYAN)),
+            Span::styled(make_mini_bar(sub.memory_rss_mb, app.monitor.system_total_ram_mb.max(1024.0), 8), Style::default().fg(COLOR_CYAN)),
         ]));
     }
 
