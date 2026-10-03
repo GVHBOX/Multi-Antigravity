@@ -1,6 +1,24 @@
+<div align="center">
+
+<img src="assets/icon.png" alt="Multi-Antigravity Logo" width="96" height="96" />
+
 # Multi-Antigravity
 
-Google Antigravity 双开与多实例管理工具，支持主账号与分身账号在同一台电脑上同时运行，互不冲突。
+**Google Antigravity 双开与多实例管理工具**
+
+让主账号与分身账号在同一台电脑上同时运行，互不冲突。
+
+[![CI](https://github.com/GVHBOX/multi-antigravity/actions/workflows/ci.yml/badge.svg)](https://github.com/GVHBOX/multi-antigravity/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Platform](https://img.shields.io/badge/Platform-Windows%2010%2F11-0078D6?logo=windows&logoColor=white)](https://github.com/GVHBOX/multi-antigravity)
+[![Rust](https://img.shields.io/badge/Rust-2024%20Edition-DEA584?logo=rust&logoColor=white)](https://www.rust-lang.org/)
+[![UI](https://img.shields.io/badge/UI-Slint%20Native-00599C)](https://slint.dev/)
+
+<br/>
+
+<img src="docs/preview.png" alt="Multi-Antigravity 界面预览" width="100%" />
+
+</div>
 
 ---
 
@@ -8,17 +26,17 @@ Google Antigravity 双开与多实例管理工具，支持主账号与分身账�
 
 官方 Google Antigravity 默认只支持登录单个账号，切换账号需要反复登出。
 
-Multi-Antigravity 为分身实例分配独立的本地运行目录：
+Multi-Antigravity 为分身分配独立的本地运行目录：
 - **主账号**：保持系统原生配置与登录状态不变。
 - **分身账号**：配置与登录凭据保存在本地独立的 `data/instance_2` 目录中。
 - **同时运行**：两个窗口独立运行，互不干扰，随时启动与退出。
 
 ---
 
-## 使用方式
+## 快速上手
 
-### 1. 桌面图形界面（默认）
-直接运行根目录的 `multi-antigravity.exe` 或运行 `start.bat`。
+### 1. 桌面图形界面（推荐）
+运行根目录的 `multi-antigravity.exe` 或运行 `start.bat`。
 
 1. 打开管理器，界面显示主账号与分身状态。
 2. 按快捷键 **Space** 或界面「启动」按钮，启动分身。
