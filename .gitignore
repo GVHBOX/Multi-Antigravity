@@ -7,3 +7,14 @@
 *.WebView2/
 *.exe
 __pycache__/
+*.pyc
+
+# IDE and Editor files
+.vscode/
+.idea/
+
+# OS metadata and logs
+.DS_Store
+Thumbs.db
+desktop.ini
+*.log

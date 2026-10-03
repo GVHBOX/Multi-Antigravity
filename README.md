@@ -121,3 +121,10 @@ multi-antigravity-rust/
 python tools/scan_comment.py
 python tools/check_front_hygiene.py
 ```
+
+---
+
+## 开源协议
+
+本项目采用 [MIT License](LICENSE) 开源。
+

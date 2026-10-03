@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+
+jobs:
+  check-and-build:
+    name: Check, Lint and Build
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Check zero comments rule
+        run: |
+          python tools/scan_comment.py
+          python tools/scan_comment.py --selfcheck
+
+      - name: Check front hygiene rule
+        run: |
+          python tools/check_front_hygiene.py
+
+      - name: Cargo Check
+        run: cargo check
+
+      - name: Cargo Build Release
+        run: cargo build --release
+
+      - name: Upload Release Binary Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: multi-antigravity-windows-x64
+          path: target/release/multi-antigravity-rust.exe
+          if-no-files-found: error
