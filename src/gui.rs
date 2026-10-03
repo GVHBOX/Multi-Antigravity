@@ -423,11 +423,11 @@ fn show_cockpit_from_tray(ui_weak: &slint::Weak<MainWindow>) {
                 if status.is_any_deployed() {
                     match crate::proxy::ProxyManager::remove_all() {
                         Ok(msg) => {
-                            ui.set_toast_message("已断开系统代理".into());
+                            ui.set_toast_message("已移除代理注入文件。".into());
                             append_log(&ui, "PROXY", &msg);
                         }
                         Err(e) => {
-                            let err = format!("断开失败: {}", e);
+                            let err = format!("移除失败: {}", e);
                             ui.set_toast_message(err.clone().into());
                             append_log(&ui, "ERROR", &err);
                         }
@@ -435,7 +435,7 @@ fn show_cockpit_from_tray(ui_weak: &slint::Weak<MainWindow>) {
                 } else {
                     match crate::proxy::ProxyManager::deploy_all() {
                         Ok(msg) => {
-                            ui.set_toast_message("系统代理已接入".into());
+                            ui.set_toast_message("已写入代理注入文件 (目标: 7890)。".into());
                             append_log(&ui, "PROXY", &msg);
                             if !status.port_online {
                                 append_log(&ui, "WARN", "本地 7890 端口未监听");
@@ -573,23 +573,26 @@ fn show_cockpit_from_tray(ui_weak: &slint::Weak<MainWindow>) {
             let p_status = crate::proxy::ProxyManager::check_status();
             if p_status.is_fully_deployed() {
                 if p_status.port_online {
-                    ui.set_proxy_status("已接入 (7890)".into());
+                    ui.set_proxy_status("已注入 (7890 在线)".into());
                     ui.set_proxy_color(slint::Color::from_rgb_u8(52, 211, 153));
                 } else {
-                    ui.set_proxy_status("端口未开 (7890)".into());
+                    ui.set_proxy_status("已注入 (端口未开)".into());
                     ui.set_proxy_color(slint::Color::from_rgb_u8(245, 158, 11));
                 }
-                ui.set_proxy_btn_text("断开系统代理".into());
-                ui.set_proxy_btn_color(slint::Color::from_rgb_u8(148, 163, 184));
+                ui.set_proxy_deployed(true);
+                ui.set_proxy_btn_text("移除代理".into());
+                ui.set_proxy_btn_color(slint::Color::from_rgb_u8(251, 113, 133));
             } else if p_status.is_any_deployed() {
-                ui.set_proxy_status("部分接入".into());
+                ui.set_proxy_status("部分注入".into());
                 ui.set_proxy_color(slint::Color::from_rgb_u8(245, 158, 11));
-                ui.set_proxy_btn_text("重新接入代理".into());
-                ui.set_proxy_btn_color(slint::Color::from_rgb_u8(56, 189, 248));
+                ui.set_proxy_deployed(true);
+                ui.set_proxy_btn_text("移除代理".into());
+                ui.set_proxy_btn_color(slint::Color::from_rgb_u8(251, 113, 133));
             } else {
-                ui.set_proxy_status("未接入".into());
+                ui.set_proxy_status("未注入".into());
                 ui.set_proxy_color(slint::Color::from_rgb_u8(100, 116, 139));
-                ui.set_proxy_btn_text("接入系统代理".into());
+                ui.set_proxy_deployed(false);
+                ui.set_proxy_btn_text("接入代理".into());
                 ui.set_proxy_btn_color(slint::Color::from_rgb_u8(56, 189, 248));
             }
         }
@@ -623,17 +626,19 @@ fn show_cockpit_from_tray(ui_weak: &slint::Weak<MainWindow>) {
 
         let initial_proxy = crate::proxy::ProxyManager::check_status();
         if initial_proxy.is_fully_deployed() {
-            main_window.set_proxy_status(if initial_proxy.port_online { "已接入 (7890)".into() } else { "端口未开 (7890)".into() });
+            main_window.set_proxy_status(if initial_proxy.port_online { "已注入 (7890 在线)".into() } else { "已注入 (端口未开)".into() });
             main_window.set_proxy_color(if initial_proxy.port_online { slint::Color::from_rgb_u8(52, 211, 153) } else { slint::Color::from_rgb_u8(245, 158, 11) });
-            main_window.set_proxy_btn_text("断开系统代理".into());
-            main_window.set_proxy_btn_color(slint::Color::from_rgb_u8(148, 163, 184));
-            append_log(&main_window, "PROXY", &format!("系统代理已接入 (本地 7890 端口: {})", if initial_proxy.port_online { "在线" } else { "未检测到监听" }));
+            main_window.set_proxy_deployed(true);
+            main_window.set_proxy_btn_text("移除代理".into());
+            main_window.set_proxy_btn_color(slint::Color::from_rgb_u8(251, 113, 133));
+            append_log(&main_window, "PROXY", &format!("代理注入文件已存在 (本地 7890 端口: {})", if initial_proxy.port_online { "在线" } else { "未检测到监听" }));
         } else {
-            main_window.set_proxy_status("未接入".into());
+            main_window.set_proxy_status("未注入".into());
             main_window.set_proxy_color(slint::Color::from_rgb_u8(100, 116, 139));
-            main_window.set_proxy_btn_text("接入系统代理".into());
+            main_window.set_proxy_deployed(false);
+            main_window.set_proxy_btn_text("接入代理".into());
             main_window.set_proxy_btn_color(slint::Color::from_rgb_u8(56, 189, 248));
-            append_log(&main_window, "PROXY", "系统代理: 未接入");
+            append_log(&main_window, "PROXY", "代理注入: 未部署");
         }
     }
 

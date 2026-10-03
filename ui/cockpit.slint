@@ -93,6 +93,9 @@ component ActionButton inherits Rectangle {
     in property <string> label_text;
     in property <color> key_color: #38bdf8;
     in property <color> text_color: #f8fafc;
+    in property <color> base_background: #131b2b;
+    in property <color> hover_background: #1e293b;
+    in property <color> pressed_background: #0b1019;
     in property <color> base_border: #27354f;
     in property <color> hover_border: #38bdf8;
     in property <bool> enabled: true;
@@ -100,7 +103,7 @@ component ActionButton inherits Rectangle {
 
     opacity: root.enabled ? 1.0 : 0.4;
     height: 26px;
-    background: ta.has_hover && root.enabled ? #1e293b : #131b2b;
+    background: !root.enabled ? #131b2b : (ta.pressed ? root.pressed_background : (ta.has_hover ? root.hover_background : root.base_background));
     border-color: ta.has_hover && root.enabled ? root.hover_border : root.base_border;
     border-width: 1px;
     border-radius: 5px;
@@ -277,10 +280,12 @@ export component MainWindow inherits Window {
     in property <string> toast_message: "座舱已就绪";
     in property <bool> token_present: false;
 
-    in property <string> proxy_status: "未接入";
+    in property <string> proxy_status: "未注入";
     in property <color> proxy_color: #64748b;
-    in property <string> proxy_btn_text: "接入系统代理";
+    in property <string> proxy_btn_text: "接入代理";
     in property <color> proxy_btn_color: #38bdf8;
+    in property <bool> proxy_deployed: false;
+    in-out property <bool> show_clear_confirm: false;
 
     in property <string> stream_source_name: "核心流: 主机语言服务 (Host-LS)";
     in property <[LogLineData]> log_lines: [];
@@ -306,17 +311,38 @@ export component MainWindow inherits Window {
         width: 0;
         height: 0;
         key-pressed(event) => {
-            if (event.text == " ") {
-                root.action_space();
+            if (root.show_clear_confirm) {
+                if (event.text == Key.Escape) {
+                    root.show_clear_confirm = false;
+                    accept
+                } else if (event.text == Key.Return || event.text == "\n") {
+                    root.show_clear_confirm = false;
+                    root.action_clear();
+                    accept
+                } else {
+                    accept
+                }
+            } else if (event.text == " ") {
+                if (root.sub_running) {
+                    root.action_kill();
+                } else {
+                    root.action_space();
+                }
                 accept
             } else if (event.text == "k" || event.text == "K") {
-                root.action_kill();
+                if (root.sub_running) {
+                    root.action_kill();
+                }
                 accept
             } else if (event.text == "r" || event.text == "R") {
-                root.action_restart();
+                if (root.sub_running) {
+                    root.action_restart();
+                }
                 accept
             } else if (event.text == "c" || event.text == "C") {
-                root.action_clear();
+                if (root.token_present) {
+                    root.show_clear_confirm = true;
+                }
                 accept
             } else if (event.text == "p" || event.text == "P") {
                 root.action_proxy();
@@ -326,9 +352,6 @@ export component MainWindow inherits Window {
                 accept
             } else if (event.text == "l" || event.text == "L") {
                 root.cycle_stream_source();
-                accept
-            } else if (event.text == "q" || event.text == "Q") {
-                root.action_quit();
                 accept
             } else {
                 reject
@@ -774,25 +797,22 @@ export component MainWindow inherits Window {
 
                         ActionButton {
                             key_text: "Space";
-                            label_text: root.sub_running ? "唤醒" : "启动分身";
-                            key_color: #38bdf8;
-                            text_color: #f8fafc;
-                            base_border: #0284c7;
-                            hover_border: #38bdf8;
+                            label_text: root.sub_running ? "断开分身" : "启动分身";
+                            key_color: root.sub_running ? #fb7185 : #38bdf8;
+                            text_color: root.sub_running ? #fecdd3 : #f8fafc;
+                            base_background: root.sub_running ? #3c1622 : #0e2a44;
+                            hover_background: root.sub_running ? #521c29 : #143d63;
+                            pressed_background: root.sub_running ? #270d15 : #081a2b;
+                            base_border: root.sub_running ? #be123c : #0284c7;
+                            hover_border: root.sub_running ? #fb7185 : #38bdf8;
                             horizontal-stretch: 1;
-                            clicked => { root.action_space(); }
-                        }
-
-                        ActionButton {
-                            key_text: "K";
-                            label_text: "停止";
-                            key_color: #fb7185;
-                            text_color: #fb7185;
-                            base_border: #4c1d24;
-                            hover_border: #fb7185;
-                            enabled: root.sub_running;
-                            horizontal-stretch: 1;
-                            clicked => { root.action_kill(); }
+                            clicked => {
+                                if (root.sub_running) {
+                                    root.action_kill();
+                                } else {
+                                    root.action_space();
+                                }
+                            }
                         }
 
                         ActionButton {
@@ -816,7 +836,7 @@ export component MainWindow inherits Window {
                             hover_border: #fb7185;
                             enabled: root.token_present;
                             horizontal-stretch: 1;
-                            clicked => { root.action_clear(); }
+                            clicked => { root.show_clear_confirm = true; }
                         }
                     }
                 }
@@ -951,13 +971,13 @@ export component MainWindow inherits Window {
 
                             HorizontalLayout {
                                 alignment: space-between;
-                                Text { text: "系统代理"; color: #cbd5e1; font-size: 13px; font-weight: 600; vertical-alignment: center; }
+                                Text { text: "代理注入"; color: #cbd5e1; font-size: 13px; font-weight: 600; vertical-alignment: center; }
                                 StatusPill { text: root.proxy_status; pill_color: root.proxy_color; show_dot: true; height: 22px; }
                             }
 
                             HorizontalLayout {
                                 alignment: space-between;
-                                Text { text: "本地端口: 7890"; color: #64748b; font-size: 12px; font-family: "Cascadia Mono"; vertical-alignment: center; }
+                                Text { text: "目标端口: 7890 (version.dll)"; color: #64748b; font-size: 12px; font-family: "Cascadia Mono"; vertical-alignment: center; }
 
                                 HorizontalLayout {
                                     spacing: 8px;
@@ -975,11 +995,14 @@ export component MainWindow inherits Window {
 
                                     ActionButton {
                                         key_text: "P";
-                                        label_text: root.proxy_btn_text;
-                                        key_color: #38bdf8;
-                                        text_color: #cbd5e1;
-                                        base_border: #27354f;
-                                        hover_border: #38bdf8;
+                                        label_text: root.proxy_deployed ? "移除代理" : "接入代理";
+                                        key_color: root.proxy_deployed ? #fb7185 : #38bdf8;
+                                        text_color: root.proxy_deployed ? #fecdd3 : #f8fafc;
+                                        base_background: root.proxy_deployed ? #3c1622 : #0e2a44;
+                                        hover_background: root.proxy_deployed ? #521c29 : #143d63;
+                                        pressed_background: root.proxy_deployed ? #270d15 : #081a2b;
+                                        base_border: root.proxy_deployed ? #be123c : #0284c7;
+                                        hover_border: root.proxy_deployed ? #fb7185 : #38bdf8;
                                         clicked => { root.action_proxy(); }
                                     }
                                 }
@@ -1255,6 +1278,116 @@ export component MainWindow inherits Window {
                     font-size: 12px;
                     font-family: "Cascadia Mono";
                     vertical-alignment: center;
+                }
+            }
+        }
+    }
+
+    if (root.show_clear_confirm) : Rectangle {
+        x: 0;
+        y: 0;
+        width: parent.width;
+        height: parent.height;
+        background: #000000bd;
+
+        TouchArea {
+        }
+
+        Rectangle {
+            width: 440px;
+            height: 180px;
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+            background: #0f141f;
+            border-color: #334155;
+            border-width: 1px;
+            border-radius: 10px;
+
+            VerticalLayout {
+                padding: 20px;
+                spacing: 14px;
+                alignment: space-between;
+
+                HorizontalLayout {
+                    spacing: 8px;
+                    alignment: start;
+                    Text {
+                        text: "⚠";
+                        color: #fb7185;
+                        font-size: 16px;
+                        font-weight: 700;
+                        vertical-alignment: center;
+                    }
+                    Text {
+                        text: "清除独立凭据确认";
+                        color: #f1f5f9;
+                        font-size: 15px;
+                        font-weight: 700;
+                        vertical-alignment: center;
+                    }
+                }
+
+                Text {
+                    text: "将删除沙箱独立 OAuth 登录凭据，分身需重新登录。是否继续？";
+                    color: #94a3b8;
+                    font-size: 13px;
+                    wrap: word-wrap;
+                }
+
+                HorizontalLayout {
+                    spacing: 12px;
+                    alignment: end;
+
+                    Rectangle {
+                        width: 96px;
+                        height: 30px;
+                        background: ta_dlg_cancel.has_hover ? #1e293b : #141b28;
+                        border-color: #334155;
+                        border-width: 1px;
+                        border-radius: 6px;
+
+                        ta_dlg_cancel := TouchArea {
+                            clicked => {
+                                root.show_clear_confirm = false;
+                            }
+                            mouse-cursor: pointer;
+                        }
+
+                        Text {
+                            text: "取消 (Esc)";
+                            color: #cbd5e1;
+                            font-size: 12px;
+                            font-weight: 600;
+                            vertical-alignment: center;
+                            horizontal-alignment: center;
+                        }
+                    }
+
+                    Rectangle {
+                        width: 120px;
+                        height: 30px;
+                        background: ta_dlg_ok.has_hover ? #9f1239 : #be123c;
+                        border-color: #fb7185;
+                        border-width: 1px;
+                        border-radius: 6px;
+
+                        ta_dlg_ok := TouchArea {
+                            clicked => {
+                                root.show_clear_confirm = false;
+                                root.action_clear();
+                            }
+                            mouse-cursor: pointer;
+                        }
+
+                        Text {
+                            text: "确认清除 (Enter)";
+                            color: #ffffff;
+                            font-size: 12px;
+                            font-weight: 600;
+                            vertical-alignment: center;
+                            horizontal-alignment: center;
+                        }
+                    }
                 }
             }
         }
