@@ -150,11 +150,16 @@ impl TelemetryMonitor {
         }
 
 
+        let num_cpus = std::thread::available_parallelism()
+            .map(|n| n.get())
+            .unwrap_or(1)
+            .max(1) as f32;
+
         self.host = ProcessStats {
             is_running: host_electron_pid.is_some(),
             electron_pid: host_electron_pid,
             ls_pid: host_ls_pid,
-            cpu_usage: host_cpu,
+            cpu_usage: (host_cpu / num_cpus).min(100.0),
             memory_rss_mb: (host_mem_bytes as f64) / (1024.0 * 1024.0),
             ls_port: self.cached_host_port,
         };
@@ -163,7 +168,7 @@ impl TelemetryMonitor {
             is_running: sub_electron_pid.is_some(),
             electron_pid: sub_electron_pid,
             ls_pid: sub_ls_pid,
-            cpu_usage: sub_cpu,
+            cpu_usage: (sub_cpu / num_cpus).min(100.0),
             memory_rss_mb: (sub_mem_bytes as f64) / (1024.0 * 1024.0),
             ls_port: self.cached_sub_port,
         };

@@ -626,7 +626,7 @@ export component MainWindow inherits Window {
                     MetricRow {
                         label: "CPU";
                         pct: root.host_cpu / 100.0;
-                        val_text: Math.round(root.host_cpu) + "%";
+                        val_text: (Math.round(root.host_cpu * 10.0) / 10.0) + "%";
                         bar_brush: @linear-gradient(90deg, #38bdf8 0%, #34d399 100%);
                     }
 
@@ -779,7 +779,7 @@ export component MainWindow inherits Window {
                     MetricRow {
                         label: "CPU";
                         pct: root.sub_running ? (root.sub_cpu / 100.0) : 0.0;
-                        val_text: root.sub_running ? (Math.round(root.sub_cpu) + "%") : "—";
+                        val_text: root.sub_running ? ((Math.round(root.sub_cpu * 10.0) / 10.0) + "%") : "—";
                         bar_brush: @linear-gradient(90deg, #38bdf8 0%, #34d399 100%);
                     }
 
