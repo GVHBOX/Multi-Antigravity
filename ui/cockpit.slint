@@ -250,10 +250,10 @@ component MetricRow inherits HorizontalLayout {
 export component MainWindow inherits Window {
     title: "Antigravity 多实例管理器 v" + root.app_version;
     icon: @image-url("../assets/icon.png");
-    preferred-width: 1900px;
-    preferred-height: 885px;
-    min-width: 1360px;
-    min-height: 760px;
+    preferred-width: 1360px;
+    preferred-height: 824px;
+    min-width: 1180px;
+    min-height: 680px;
     background: root.redraw_tick == 0 ? #07090e : #07090f;
     in-out property <int> redraw_tick: 0;
 
