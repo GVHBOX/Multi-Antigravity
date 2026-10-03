@@ -10,6 +10,9 @@ jobs:
   check-and-build:
     name: Check, Lint and Build
     runs-on: windows-latest
+    env:
+      PYTHONUTF8: "1"
+      PYTHONIOENCODING: "utf-8"
 
     steps:
       - name: Checkout repository

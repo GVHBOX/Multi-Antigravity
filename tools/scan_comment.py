@@ -14,7 +14,13 @@ tools/ 不算核心源码，那里的 docstring 与注释照常允许，所以�
 import json
 import os
 import re
+import sys
 from pathlib import Path
+
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 ROOT = Path(os.environ.get("SCAN_ROOT") or Path(__file__).resolve().parents[1])
 
