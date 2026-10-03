@@ -33,65 +33,6 @@ component StatusPill inherits Rectangle {
     }
 }
 
-component KpiCard inherits Rectangle {
-    in property <string> title;
-    in property <string> value;
-    in property <string> sub_left;
-    in property <string> sub_right;
-    in property <color> val_color: #f1f5f9;
-    in property <color> highlight_color: #38bdf8;
-
-    background: #0e131f;
-    border-color: #1e293b;
-    border-width: 1px;
-    border-radius: 10px;
-
-    Rectangle {
-        x: 0;
-        y: 0;
-        width: 3px;
-        height: parent.height;
-        background: root.highlight_color;
-    }
-
-    VerticalLayout {
-        padding-left: 18px;
-        padding-right: 16px;
-        padding-top: 14px;
-        padding-bottom: 14px;
-        spacing: 8px;
-        alignment: center;
-
-        HorizontalLayout {
-            Text {
-                text: root.title;
-                color: #94a3b8;
-                font-size: 13px;
-                horizontal-alignment: left;
-            }
-            Text {
-                text: root.sub_left;
-                color: #64748b;
-                font-size: 12px;
-                horizontal-alignment: right;
-            }
-        }
-
-        Text {
-            text: root.value;
-            color: root.val_color;
-            font-size: 27px;
-            font-weight: 800;
-        }
-
-        Text {
-            text: root.sub_right;
-            color: #64748b;
-            font-size: 12px;
-        }
-    }
-}
-
 export struct LogLineData {
     line_no: string,
     time_str: string,
@@ -202,6 +143,111 @@ component KeyButton inherits Rectangle {
     }
 }
 
+component EnvRow inherits Rectangle {
+    in property <string> row_key;
+    in property <string> row_val;
+    in property <string> status_text;
+    in property <color> status_color: #34d399;
+
+    height: 32px;
+
+    Rectangle {
+        y: parent.height - 1px;
+        height: 1px;
+        background: #141b28;
+    }
+
+    HorizontalLayout {
+        padding-left: 12px;
+        padding-right: 12px;
+        spacing: 10px;
+        alignment: space-between;
+
+        Text {
+            width: 116px;
+            text: root.row_key;
+            color: #cbd5e1;
+            font-size: 12px;
+            font-weight: 600;
+            font-family: "Cascadia Mono";
+            vertical-alignment: center;
+        }
+
+        Text {
+            text: root.row_val;
+            color: #64748b;
+            font-size: 11px;
+            font-family: "Cascadia Mono";
+            vertical-alignment: center;
+            overflow: elide;
+            horizontal-stretch: 1;
+        }
+
+        HorizontalLayout {
+            spacing: 5px;
+            alignment: end;
+            Rectangle {
+                width: 6px;
+                height: 6px;
+                border-radius: 3px;
+                background: root.status_color;
+                y: (parent.height - 6px) / 2;
+            }
+            Text {
+                text: root.status_text;
+                color: root.status_color;
+                font-size: 11px;
+                font-weight: 600;
+                vertical-alignment: center;
+            }
+        }
+    }
+}
+
+component MetricRow inherits HorizontalLayout {
+    in property <string> label;
+    in property <float> pct: 0.0;
+    in property <string> val_text;
+    in property <brush> bar_brush: @linear-gradient(90deg, #38bdf8 0%, #34d399 100%);
+
+    spacing: 12px;
+    height: 22px;
+
+    Text {
+        width: 88px;
+        text: root.label;
+        color: #94a3b8;
+        font-size: 12px;
+        vertical-alignment: center;
+    }
+
+    Rectangle {
+        background: #131b2b;
+        border-radius: 4px;
+        height: 8px;
+        horizontal-stretch: 1;
+        y: (parent.height - 8px) / 2;
+
+        Rectangle {
+            x: 0;
+            width: parent.width * Math.min(1.0, root.pct);
+            height: 8px;
+            border-radius: 4px;
+            background: root.bar_brush;
+        }
+    }
+
+    Text {
+        width: 64px;
+        text: root.val_text;
+        color: #e2e8f0;
+        font-size: 12px;
+        font-family: "Cascadia Mono";
+        horizontal-alignment: right;
+        vertical-alignment: center;
+    }
+}
+
 export component MainWindow inherits Window {
     title: "Antigravity 多实例管理器 v" + root.app_version;
     icon: @image-url("../assets/icon.png");
@@ -234,7 +280,6 @@ export component MainWindow inherits Window {
     in property <string> total_ram: "342.6 MB";
     in property <string> toast_message: "座舱已就绪";
     in property <bool> token_present: false;
-
 
     in property <string> proxy_status: "未部署代理";
     in property <color> proxy_color: #64748b;
@@ -309,13 +354,13 @@ export component MainWindow inherits Window {
         padding-bottom: 24px;
         padding-left: 48px;
         padding-right: 48px;
-        spacing: 16px;
+        spacing: 14px;
 
         Rectangle {
             background: #0e121b;
             border-color: #1e293b;
             border-width: 1px;
-            border-radius: 8px;
+            border-radius: 10px;
             height: 64px;
 
             HorizontalLayout {
@@ -325,7 +370,7 @@ export component MainWindow inherits Window {
                 alignment: space-between;
 
                 HorizontalLayout {
-                    spacing: 10px;
+                    spacing: 12px;
                     alignment: start;
 
                     Image {
@@ -367,16 +412,12 @@ export component MainWindow inherits Window {
                                     }
                                 }
                             }
-                            Text {
-                                text: "/";
-                                color: #475569;
-                                font-size: 15px;
-                            }
-                            Text {
-                                text: root.app_subtitle;
-                                color: #94a3b8;
-                                font-size: 14px;
-                            }
+                        }
+
+                        Text {
+                            text: root.app_subtitle;
+                            color: #94a3b8;
+                            font-size: 13px;
                         }
                     }
                 }
@@ -392,21 +433,21 @@ export component MainWindow inherits Window {
                             text: root.kernel_status;
                             pill_color: #34d399;
                             show_dot: true;
-                            height: 34px;
+                            height: 32px;
                         }
 
                         StatusPill {
                             text: root.ram_overhead;
                             pill_color: #38bdf8;
                             show_dot: false;
-                            height: 34px;
+                            height: 32px;
                         }
 
                         StatusPill {
-                            text: root.proxy_status;
-                            pill_color: root.proxy_color;
+                            text: "沙箱隔离已就绪";
+                            pill_color: #c084fc;
                             show_dot: true;
-                            height: 34px;
+                            height: 32px;
                         }
 
                         Rectangle {
@@ -414,7 +455,7 @@ export component MainWindow inherits Window {
                             border-color: rgba(56, 189, 248, 0.22);
                             border-width: 1px;
                             border-radius: 8px;
-                            height: 34px;
+                            height: 32px;
 
                             HorizontalLayout {
                                 padding-left: 14px;
@@ -424,7 +465,7 @@ export component MainWindow inherits Window {
                                 Text {
                                     text: root.current_time;
                                     color: #38bdf8;
-                                    font-size: 18px;
+                                    font-size: 17px;
                                     font-weight: 700;
                                     font-family: "Cascadia Mono";
                                     vertical-alignment: center;
@@ -433,126 +474,148 @@ export component MainWindow inherits Window {
                         }
                     }
                 }
-
             }
         }
 
         HorizontalLayout {
             spacing: 16px;
-            height: 110px;
-
-            KpiCard {
-                title: "主机进程";
-                sub_left: root.host_running ? "在线" : "未运行";
-                value: root.host_running ? "进程在线" : "未运行";
-                sub_right: root.host_port == "--" ? "服务未就绪" : "服务: " + root.host_port;
-                val_color: root.host_running ? #34d399 : #64748b;
-                highlight_color: #34d399;
-            }
-
-            KpiCard {
-                title: "分身进程";
-                sub_left: root.sub_running ? (root.sub_pid == "--" ? "在线" : "PID: " + root.sub_pid) : "未运行";
-                value: root.sub_running ? "进程在线" : "未运行";
-                sub_right: root.sub_running ? (root.sub_port == "--" ? "服务未就绪" : "服务: " + root.sub_port) : "服务未启动";
-                val_color: root.sub_running ? #38bdf8 : #64748b;
-                highlight_color: #38bdf8;
-            }
-
-            KpiCard {
-                title: "双实例总内存";
-                sub_left: "RSS";
-                value: root.total_ram;
-                sub_right: "主机 " + Math.round(root.host_ram) + " MB · 分身 " + Math.round(root.sub_ram) + " MB";
-                val_color: #f1f5f9;
-                highlight_color: #818cf8;
-            }
-
-            KpiCard {
-                title: "凭据隔离";
-                sub_left: "沙箱环境";
-                value: root.token_present ? "已授权" : "待授权";
-                sub_right: root.token_present ? "第二账号已就绪" : "未检测到凭据";
-                val_color: root.token_present ? #c084fc : #fbbf24;
-                highlight_color: root.token_present ? #c084fc : #fbbf24;
-            }
-
-        }
-
-        HorizontalLayout {
-            spacing: 16px;
-            min-height: 200px;
+            height: 206px;
 
             Rectangle {
                 background: #0e121b;
                 border-color: #1e293b;
                 border-width: 1px;
-                border-radius: 8px;
+                border-radius: 10px;
                 horizontal-stretch: 1;
 
+                Rectangle {
+                    x: 0;
+                    y: 0;
+                    width: 3px;
+                    height: parent.height;
+                    background: #34d399;
+                }
+
                 VerticalLayout {
-                    padding: 18px;
-                    spacing: 14px;
+                    padding-left: 18px;
+                    padding-right: 18px;
+                    padding-top: 14px;
+                    padding-bottom: 14px;
+                    spacing: 6px;
                     alignment: start;
 
                     HorizontalLayout {
+                        height: 26px;
                         alignment: space-between;
+
                         HorizontalLayout {
-                            spacing: 6px;
-                            Rectangle { width: 10px; height: 10px; border-radius: 5px; background: #34d399; y: (parent.height - 10px) / 2; }
-                            Text { text: "主机实例 · 主账号"; color: #f1f5f9; font-size: 15px; font-weight: 700; }
+                            spacing: 8px;
+                            Rectangle {
+                                width: 8px;
+                                height: 8px;
+                                border-radius: 4px;
+                                background: #34d399;
+                                y: (parent.height - 8px) / 2;
+                            }
+                            Text {
+                                text: "主机实例 · 主账号";
+                                color: #f1f5f9;
+                                font-size: 15px;
+                                font-weight: 700;
+                                vertical-alignment: center;
+                            }
+                            Rectangle {
+                                background: rgba(52, 211, 153, 0.10);
+                                border-color: rgba(52, 211, 153, 0.26);
+                                border-width: 1px;
+                                border-radius: 4px;
+                                height: 20px;
+                                y: (parent.height - 20px) / 2;
+                                HorizontalLayout {
+                                    padding-left: 8px;
+                                    padding-right: 8px;
+                                    alignment: center;
+                                    Text {
+                                        text: "宿主";
+                                        color: #34d399;
+                                        font-size: 11px;
+                                        font-weight: 600;
+                                        vertical-alignment: center;
+                                    }
+                                }
+                            }
                         }
-                        StatusPill { text: "主机进程"; pill_color: #34d399; show_dot: false; height: 20px; }
+
+                        Rectangle {
+                            background: #0a0e17;
+                            border-color: #1e293b;
+                            border-width: 1px;
+                            border-radius: 5px;
+                            height: 22px;
+                            y: (parent.height - 22px) / 2;
+                            HorizontalLayout {
+                                padding-left: 8px;
+                                padding-right: 8px;
+                                alignment: center;
+                                Text {
+                                    text: root.host_running ? "宿主在线" : "未运行";
+                                    color: #94a3b8;
+                                    font-size: 11px;
+                                    font-family: "Cascadia Mono";
+                                    vertical-alignment: center;
+                                }
+                            }
+                        }
                     }
 
-                    VerticalLayout {
-                        spacing: 6px;
+                    HorizontalLayout {
+                        height: 26px;
+                        spacing: 10px;
                         alignment: start;
 
-                        HorizontalLayout {
-                            Text { text: "语言服务:"; color: #94a3b8; font-size: 13px; width: 118px; }
-                            Text { text: root.host_port; color: #818cf8; font-size: 13px; font-weight: 600; }
+                        Text {
+                            text: root.host_running ? "在线" : "未运行";
+                            color: root.host_running ? #34d399 : #64748b;
+                            font-size: 20px;
+                            font-weight: 800;
+                            vertical-alignment: center;
                         }
-                        HorizontalLayout {
-                            Text { text: "账号状态:"; color: #94a3b8; font-size: 13px; width: 118px; }
-                            Text { text: "主账号"; color: #34d399; font-size: 13px; }
+
+                        Text {
+                            text: root.host_running ? "系统宿主环境" : "未检测到进程";
+                            color: #64748b;
+                            font-size: 12px;
+                            font-family: "Cascadia Mono";
+                            vertical-alignment: center;
                         }
-                        HorizontalLayout {
-                            Text { text: "CPU 负载:"; color: #94a3b8; font-size: 13px; width: 118px; }
-                            Rectangle {
-                                background: #1e293b;
-                                border-radius: 5px;
-                                height: 10px;
-                                horizontal-stretch: 1;
-                                y: (parent.height - 10px) / 2;
-                                Rectangle {
-                                    x: 0;
-                                    width: parent.width * Math.min(1.0, root.host_cpu / 100.0);
-                                    height: 10px;
-                                    border-radius: 5px;
-                                    background: @linear-gradient(90deg, #38bdf8 0%, #34d399 100%);
-                                }
-                            }
-                            Text { text: Math.round(root.host_cpu) + "%"; color: #cbd5e1; font-size: 13px; width: 62px; horizontal-alignment: right; }
-                        }
-                        HorizontalLayout {
-                            Text { text: "RSS:"; color: #94a3b8; font-size: 13px; width: 118px; }
-                            Rectangle {
-                                background: #1e293b;
-                                border-radius: 5px;
-                                height: 10px;
-                                horizontal-stretch: 1;
-                                y: (parent.height - 10px) / 2;
-                                Rectangle {
-                                    x: 0;
-                                    width: parent.width * Math.min(1.0, root.host_ram / 1024.0);
-                                    height: 10px;
-                                    border-radius: 5px;
-                                    background: @linear-gradient(90deg, #34d399 0%, #22d3ee 100%);
-                                }
-                            }
-                            Text { text: Math.round(root.host_ram) + " MB"; color: #cbd5e1; font-size: 13px; width: 62px; horizontal-alignment: right; }
-                        }
+                    }
+
+                    HorizontalLayout {
+                        height: 20px;
+                        spacing: 12px;
+                        Text { text: "语言服务"; color: #94a3b8; font-size: 12px; width: 88px; vertical-alignment: center; }
+                        Text { text: root.host_port == "--" ? "服务未就绪" : "127.0.0.1:" + root.host_port; color: #818cf8; font-size: 12px; font-family: "Cascadia Mono"; font-weight: 600; vertical-alignment: center; }
+                    }
+
+                    HorizontalLayout {
+                        height: 20px;
+                        spacing: 12px;
+                        Text { text: "凭据存储"; color: #94a3b8; font-size: 12px; width: 88px; vertical-alignment: center; }
+                        Text { text: "Windows 凭据"; color: #34d399; font-size: 12px; font-weight: 600; vertical-alignment: center; }
+                    }
+
+                    MetricRow {
+                        label: "CPU";
+                        pct: root.host_cpu / 100.0;
+                        val_text: Math.round(root.host_cpu) + "%";
+                        bar_brush: @linear-gradient(90deg, #38bdf8 0%, #34d399 100%);
+                    }
+
+                    MetricRow {
+                        label: "物理内存";
+                        pct: root.host_ram / 1024.0;
+                        val_text: Math.round(root.host_ram) + " MB";
+                        bar_brush: @linear-gradient(90deg, #34d399 0%, #22d3ee 100%);
                     }
                 }
             }
@@ -561,85 +624,137 @@ export component MainWindow inherits Window {
                 background: #0e121b;
                 border-color: root.sub_running ? #0284c7 : #1e293b;
                 border-width: 1px;
-                border-radius: 8px;
+                border-radius: 10px;
                 horizontal-stretch: 1;
-                vertical-stretch: 0;
-                height: 330px;
+
+                Rectangle {
+                    x: 0;
+                    y: 0;
+                    width: 3px;
+                    height: parent.height;
+                    background: #38bdf8;
+                }
 
                 VerticalLayout {
-                    padding: 18px;
-                    spacing: 14px;
+                    padding-left: 18px;
+                    padding-right: 18px;
+                    padding-top: 14px;
+                    padding-bottom: 14px;
+                    spacing: 6px;
                     alignment: start;
 
                     HorizontalLayout {
+                        height: 26px;
                         alignment: space-between;
+
                         HorizontalLayout {
-                            spacing: 6px;
+                            spacing: 8px;
                             Rectangle {
-                                width: 10px;
-                                height: 10px;
-                                border-radius: 5px;
+                                width: 8px;
+                                height: 8px;
+                                border-radius: 4px;
                                 background: root.sub_running ? #38bdf8 : #64748b;
-                                y: (parent.height - 10px) / 2;
+                                y: (parent.height - 8px) / 2;
                             }
-                        Text { text: "分身实例 · 第二账号"; color: #f1f5f9; font-size: 15px; font-weight: 700; }
+                            Text {
+                                text: "分身实例 · 第二账号";
+                                color: #f1f5f9;
+                                font-size: 15px;
+                                font-weight: 700;
+                                vertical-alignment: center;
+                            }
+                            Rectangle {
+                                background: rgba(56, 189, 248, 0.10);
+                                border-color: rgba(56, 189, 248, 0.26);
+                                border-width: 1px;
+                                border-radius: 4px;
+                                height: 20px;
+                                y: (parent.height - 20px) / 2;
+                                HorizontalLayout {
+                                    padding-left: 8px;
+                                    padding-right: 8px;
+                                    alignment: center;
+                                    Text {
+                                        text: "沙箱";
+                                        color: #38bdf8;
+                                        font-size: 11px;
+                                        font-weight: 600;
+                                        vertical-alignment: center;
+                                    }
+                                }
+                            }
                         }
-                        StatusPill {
-                            text: root.sub_running ? "分身进程" : "已停止";
-                            pill_color: root.sub_running ? #38bdf8 : #64748b;
-                            show_dot: false;
-                            height: 20px;
+
+                        Rectangle {
+                            background: #0a0e17;
+                            border-color: #1e293b;
+                            border-width: 1px;
+                            border-radius: 5px;
+                            height: 22px;
+                            y: (parent.height - 22px) / 2;
+                            HorizontalLayout {
+                                padding-left: 8px;
+                                padding-right: 8px;
+                                alignment: center;
+                                Text {
+                                    text: root.sub_running ? (root.sub_pid == "--" ? "在线" : "PID " + root.sub_pid) : "未运行";
+                                    color: #94a3b8;
+                                    font-size: 11px;
+                                    font-family: "Cascadia Mono";
+                                    vertical-alignment: center;
+                                }
+                            }
                         }
                     }
 
-                    VerticalLayout {
-                        spacing: 6px;
+                    HorizontalLayout {
+                        height: 26px;
+                        spacing: 10px;
                         alignment: start;
 
-                        HorizontalLayout {
-                            Text { text: "语言服务:"; color: #94a3b8; font-size: 13px; width: 118px; }
-                            Text { text: root.sub_port; color: #818cf8; font-size: 13px; font-weight: 600; }
+                        Text {
+                            text: root.sub_running ? "运行中" : "未运行";
+                            color: root.sub_running ? #38bdf8 : #64748b;
+                            font-size: 20px;
+                            font-weight: 800;
+                            vertical-alignment: center;
                         }
-                        HorizontalLayout {
-                            Text { text: "账号状态:"; color: #94a3b8; font-size: 13px; width: 118px; }
-                            Text { text: "第二账号"; color: #fbbf24; font-size: 13px; }
+
+                        Text {
+                            text: root.sub_running ? "沙箱隔离运行" : "沙箱环境就绪";
+                            color: #64748b;
+                            font-size: 12px;
+                            font-family: "Cascadia Mono";
+                            vertical-alignment: center;
                         }
-                        HorizontalLayout {
-                            Text { text: "CPU 负载:"; color: #94a3b8; font-size: 13px; width: 118px; }
-                            Rectangle {
-                                background: #1e293b;
-                                border-radius: 5px;
-                                height: 10px;
-                                horizontal-stretch: 1;
-                                y: (parent.height - 10px) / 2;
-                                Rectangle {
-                                    x: 0;
-                                    width: parent.width * Math.min(1.0, root.sub_cpu / 100.0);
-                                    height: 10px;
-                                    border-radius: 5px;
-                                    background: @linear-gradient(90deg, #38bdf8 0%, #34d399 100%);
-                                }
-                            }
-                            Text { text: Math.round(root.sub_cpu) + "%"; color: #cbd5e1; font-size: 13px; width: 62px; horizontal-alignment: right; }
-                        }
-                        HorizontalLayout {
-                            Text { text: "RSS:"; color: #94a3b8; font-size: 13px; width: 118px; }
-                            Rectangle {
-                                background: #1e293b;
-                                border-radius: 5px;
-                                height: 10px;
-                                horizontal-stretch: 1;
-                                y: (parent.height - 10px) / 2;
-                                Rectangle {
-                                    x: 0;
-                                    width: parent.width * Math.min(1.0, root.sub_ram / 1024.0);
-                                    height: 10px;
-                                    border-radius: 5px;
-                                    background: @linear-gradient(90deg, #34d399 0%, #22d3ee 100%);
-                                }
-                            }
-                            Text { text: Math.round(root.sub_ram) + " MB"; color: #cbd5e1; font-size: 13px; width: 62px; horizontal-alignment: right; }
-                        }
+                    }
+
+                    HorizontalLayout {
+                        height: 20px;
+                        spacing: 12px;
+                        Text { text: "语言服务"; color: #94a3b8; font-size: 12px; width: 88px; vertical-alignment: center; }
+                        Text { text: root.sub_running ? (root.sub_port == "--" ? "服务未就绪" : "127.0.0.1:" + root.sub_port) : "服务未启动"; color: #818cf8; font-size: 12px; font-family: "Cascadia Mono"; font-weight: 600; vertical-alignment: center; }
+                    }
+
+                    HorizontalLayout {
+                        height: 20px;
+                        spacing: 12px;
+                        Text { text: "凭据存储"; color: #94a3b8; font-size: 12px; width: 88px; vertical-alignment: center; }
+                        Text { text: root.token_present ? "已绑定" : "待授权"; color: root.token_present ? #fbbf24 : #64748b; font-size: 12px; font-weight: 600; vertical-alignment: center; }
+                    }
+
+                    MetricRow {
+                        label: "CPU";
+                        pct: root.sub_running ? (root.sub_cpu / 100.0) : 0.0;
+                        val_text: root.sub_running ? (Math.round(root.sub_cpu) + "%") : "—";
+                        bar_brush: @linear-gradient(90deg, #38bdf8 0%, #34d399 100%);
+                    }
+
+                    MetricRow {
+                        label: "物理内存";
+                        pct: root.sub_running ? (root.sub_ram / 1024.0) : 0.0;
+                        val_text: root.sub_running ? (Math.round(root.sub_ram) + " MB") : "—";
+                        bar_brush: @linear-gradient(90deg, #34d399 0%, #22d3ee 100%);
                     }
                 }
             }
@@ -649,100 +764,155 @@ export component MainWindow inherits Window {
             spacing: 16px;
             vertical-stretch: 1;
 
-            VerticalLayout {
-                horizontal-stretch: 1;
-                alignment: start;
+            Rectangle {
+                background: #0e121b;
+                border-color: #1e293b;
+                border-width: 1px;
+                border-radius: 10px;
+                horizontal-stretch: 4;
 
-                Rectangle {
-                    background: #0e121b;
-                    border-color: #1e293b;
-                    border-width: 1px;
-                    border-radius: 8px;
-                    horizontal-stretch: 1;
-                    vertical-stretch: 0;
-                    height: 330px;
+                VerticalLayout {
+                    padding: 16px;
+                    spacing: 12px;
 
-                    VerticalLayout {
-                        padding: 18px;
-                        spacing: 12px;
-                        alignment: start;
+                    HorizontalLayout {
+                        alignment: space-between;
+                        height: 22px;
+                        HorizontalLayout {
+                            spacing: 8px;
+                            Text { text: "隔离环境"; color: #f1f5f9; font-size: 14px; font-weight: 700; vertical-alignment: center; }
+                            Text { text: "data\\instance_2"; color: #64748b; font-size: 12px; font-family: "Cascadia Mono"; vertical-alignment: center; }
+                        }
+                        HorizontalLayout {
+                            spacing: 5px;
+                            alignment: end;
+                            Rectangle { width: 6px; height: 6px; border-radius: 3px; background: #34d399; y: (parent.height - 6px) / 2; }
+                            Text { text: "隔离生效"; color: #34d399; font-size: 11px; font-weight: 600; vertical-alignment: center; }
+                        }
+                    }
+
+                    Rectangle {
+                        background: #0b0f18;
+                        border-color: #1e293b;
+                        border-width: 1px;
+                        border-radius: 8px;
+                        height: 48px;
 
                         HorizontalLayout {
+                            padding-left: 14px;
+                            padding-right: 14px;
                             alignment: space-between;
-                            Text { text: "沙箱环境"; color: #f1f5f9; font-size: 14px; font-weight: 700; }
-                            Text { text: "data/instance_2"; color: #64748b; font-size: 12px; }
+
+                            VerticalLayout {
+                                alignment: center;
+                                spacing: 2px;
+                                HorizontalLayout {
+                                    spacing: 4px;
+                                    Text { text: root.total_ram; color: #f1f5f9; font-size: 20px; font-weight: 800; font-family: "Cascadia Mono"; vertical-alignment: center; }
+                                }
+                                Text { text: "双实例物理内存汇总"; color: #94a3b8; font-size: 11px; }
+                            }
+
+                            HorizontalLayout {
+                                alignment: end;
+                                spacing: 8px;
+
+                                Rectangle {
+                                    background: #0a0e17;
+                                    border-color: #1e293b;
+                                    border-width: 1px;
+                                    border-radius: 5px;
+                                    height: 26px;
+                                    y: (parent.height - 26px) / 2;
+                                    HorizontalLayout {
+                                        padding-left: 8px;
+                                        padding-right: 8px;
+                                        spacing: 5px;
+                                        alignment: center;
+                                        Rectangle { width: 6px; height: 6px; border-radius: 3px; background: #34d399; y: (parent.height - 6px) / 2; }
+                                        Text { text: "主机 " + Math.round(root.host_ram) + " MB"; color: #cbd5e1; font-size: 11px; font-family: "Cascadia Mono"; vertical-alignment: center; }
+                                    }
+                                }
+
+                                Rectangle {
+                                    background: #0a0e17;
+                                    border-color: #1e293b;
+                                    border-width: 1px;
+                                    border-radius: 5px;
+                                    height: 26px;
+                                    y: (parent.height - 26px) / 2;
+                                    HorizontalLayout {
+                                        padding-left: 8px;
+                                        padding-right: 8px;
+                                        spacing: 5px;
+                                        alignment: center;
+                                        Rectangle { width: 6px; height: 6px; border-radius: 3px; background: #38bdf8; y: (parent.height - 6px) / 2; }
+                                        Text { text: "分身 " + Math.round(root.sub_ram) + " MB"; color: #cbd5e1; font-size: 11px; font-family: "Cascadia Mono"; vertical-alignment: center; }
+                                    }
+                                }
+                            }
                         }
+                    }
+
+                    Rectangle {
+                        background: #0b0f18;
+                        border-color: #1e293b;
+                        border-width: 1px;
+                        border-radius: 8px;
+                        clip: true;
 
                         VerticalLayout {
-                            spacing: 10px;
+                            spacing: 0px;
 
-                            Rectangle {
-                                background: #07090e;
-                                border-color: #1e293b;
-                                border-width: 1px;
-                                border-radius: 8px;
-                                height: 44px;
-                                HorizontalLayout {
-                                    padding-left: 14px; padding-right: 14px;
-                                    alignment: space-between;
-                                    Text { text: "USERPROFILE"; color: #cbd5e1; font-size: 13px; font-weight: 600; vertical-alignment: center; }
-                                    Text { text: "...\\data\\instance_2\\home (已隔离)"; color: #34d399; font-size: 12px; vertical-alignment: center; }
-                                }
+                            EnvRow { row_key: "USERPROFILE"; row_val: "…\\data\\instance_2\\home"; status_text: "已隔离"; status_color: #34d399; }
+                            EnvRow { row_key: "HOME"; row_val: "…\\data\\instance_2\\home"; status_text: "已隔离"; status_color: #34d399; }
+                            EnvRow { row_key: "APPDATA"; row_val: "…\\data\\instance_2\\AppData\\Roaming"; status_text: "已隔离"; status_color: #34d399; }
+                            EnvRow { row_key: "LOCALAPPDATA"; row_val: "保持系统默认"; status_text: "继承系统"; status_color: #38bdf8; }
+                            EnvRow { row_key: "SSH_CONNECTION"; row_val: "127.0.0.1 50000 127.0.0.1 22"; status_text: "已注入"; status_color: #c084fc; }
+                            EnvRow { row_key: "凭据文件"; row_val: "home\\.gemini\\jetski-standalone-oauth-token"; status_text: root.token_present ? "存在" : "不存在"; status_color: root.token_present ? #34d399 : #64748b; }
+                        }
+                    }
+
+                    Rectangle {
+                        background: #0b0f18;
+                        border-color: #1e293b;
+                        border-width: 1px;
+                        border-radius: 8px;
+                        height: 68px;
+
+                        VerticalLayout {
+                            padding-left: 14px;
+                            padding-right: 14px;
+                            spacing: 6px;
+                            alignment: center;
+
+                            HorizontalLayout {
+                                alignment: space-between;
+                                Text { text: "免 TUN 代理"; color: #cbd5e1; font-size: 13px; font-weight: 600; vertical-alignment: center; }
+                                StatusPill { text: root.proxy_status; pill_color: root.proxy_color; show_dot: true; height: 22px; }
                             }
 
-                            Rectangle {
-                                background: #07090e;
-                                border-color: #1e293b;
-                                border-width: 1px;
-                                border-radius: 8px;
-                                height: 44px;
-                                HorizontalLayout {
-                                    padding-left: 14px; padding-right: 14px;
-                                    alignment: space-between;
-                                    Text { text: "APPDATA"; color: #cbd5e1; font-size: 13px; font-weight: 600; vertical-alignment: center; }
-                                    Text { text: "...\\data\\instance_2\\AppData\\Roaming (已隔离)"; color: #34d399; font-size: 12px; vertical-alignment: center; }
-                                }
-                            }
-
-                            Rectangle {
-                                background: #07090e;
-                                border-color: #1e293b;
-                                border-width: 1px;
-                                border-radius: 8px;
-                                height: 44px;
-                                HorizontalLayout {
-                                    padding-left: 14px; padding-right: 14px;
-                                    alignment: space-between;
-                                    Text { text: "LOCALAPPDATA"; color: #cbd5e1; font-size: 13px; font-weight: 600; vertical-alignment: center; }
-                                    Text { text: "保持系统默认"; color: #38bdf8; font-size: 12px; vertical-alignment: center; }
-                                }
-                            }
-
-                            Rectangle {
-                                background: #07090e;
-                                border-color: #1e293b;
-                                border-width: 1px;
-                                border-radius: 8px;
-                                height: 44px;
-                                HorizontalLayout {
-                                    padding-left: 14px; padding-right: 14px;
-                                    alignment: space-between;
-                                    Text { text: "SSH_CONNECTION"; color: #cbd5e1; font-size: 13px; font-weight: 600; vertical-alignment: center; }
-                                    Text { text: "独立凭据"; color: #c084fc; font-size: 12px; vertical-alignment: center; }
-                                }
-                            }
-
-                            Rectangle {
-                                background: #07090e;
-                                border-color: #1e293b;
-                                border-width: 1px;
-                                border-radius: 8px;
-                                height: 44px;
-                                HorizontalLayout {
-                                    padding-left: 14px; padding-right: 14px;
-                                    alignment: space-between;
-                                    Text { text: "沙箱根目录"; color: #cbd5e1; font-size: 13px; font-weight: 600; vertical-alignment: center; }
-                                    Text { text: root.sandbox_root; color: #94a3b8; font-size: 12px; vertical-alignment: center; overflow: elide; horizontal-stretch: 1; horizontal-alignment: right; }
+                            HorizontalLayout {
+                                alignment: space-between;
+                                Text { text: "本地端口: 7890"; color: #64748b; font-size: 12px; font-family: "Cascadia Mono"; vertical-alignment: center; }
+                                Rectangle {
+                                    background: root.proxy_btn_color.transparentize(85%);
+                                    border-color: root.proxy_btn_color.transparentize(50%);
+                                    border-width: 1px;
+                                    border-radius: 5px;
+                                    height: 24px;
+                                    ta_proxy := TouchArea {
+                                        clicked => { root.action_proxy(); }
+                                        mouse-cursor: pointer;
+                                    }
+                                    HorizontalLayout {
+                                        padding-left: 8px;
+                                        padding-right: 8px;
+                                        spacing: 5px;
+                                        alignment: center;
+                                        Text { text: "P"; color: root.proxy_btn_color; font-size: 11px; font-weight: 700; vertical-alignment: center; }
+                                        Text { text: root.proxy_btn_text; color: root.proxy_btn_color; font-size: 11px; font-weight: 600; vertical-alignment: center; }
+                                    }
                                 }
                             }
                         }
@@ -751,11 +921,11 @@ export component MainWindow inherits Window {
             }
 
             Rectangle {
-                background: #05070c;
+                background: #0e121b;
                 border-color: #1e293b;
                 border-width: 1px;
-                border-radius: 8px;
-                horizontal-stretch: 1;
+                border-radius: 10px;
+                horizontal-stretch: 6;
 
                 VerticalLayout {
                     padding: 16px;
@@ -763,6 +933,7 @@ export component MainWindow inherits Window {
 
                     HorizontalLayout {
                         alignment: space-between;
+                        height: 28px;
 
                         HorizontalLayout {
                             spacing: 4px;
@@ -860,7 +1031,6 @@ export component MainWindow inherits Window {
                                 show_dot: true;
                                 height: 26px;
                             }
-
                         }
                     }
 
@@ -984,7 +1154,6 @@ export component MainWindow inherits Window {
                                         overflow: elide;
                                         horizontal-stretch: 1;
                                     }
-
                                 }
                             }
                         }
@@ -994,7 +1163,7 @@ export component MainWindow inherits Window {
         }
 
         VerticalLayout {
-            spacing: 14px;
+            spacing: 12px;
 
             HorizontalLayout {
                 spacing: 10px;
@@ -1077,9 +1246,15 @@ export component MainWindow inherits Window {
                         Text { text: root.toast_message; color: #94a3b8; font-size: 13px; vertical-alignment: center; }
                     }
 
+                    Text {
+                        text: "Slint 1.18 · 软件光栅后端";
+                        color: #475569;
+                        font-size: 12px;
+                        font-family: "Cascadia Mono";
+                        vertical-alignment: center;
+                    }
                 }
             }
         }
     }
-
 }
