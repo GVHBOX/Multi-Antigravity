@@ -1,0 +1,72 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    name: Build and Release
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Check zero comments rule
+        run: |
+          python tools/scan_comment.py
+          python tools/scan_comment.py --selfcheck
+
+      - name: Check front hygiene rule
+        run: |
+          python tools/check_front_hygiene.py
+
+      - name: Build Release Binary
+        run: cargo build --release
+
+      - name: Package Release
+        shell: powershell
+        run: |
+          $tag = $env:GITHUB_REF_NAME
+          $distName = "multi-antigravity-$tag-windows-x64"
+          $distDir = "target/dist/$distName"
+          New-Item -ItemType Directory -Path $distDir -Force | Out-Null
+          
+          Copy-Item "target/release/multi-antigravity-rust.exe" -Destination "$distDir/multi-antigravity.exe"
+          Copy-Item "start.bat" -Destination "$distDir/"
+          Copy-Item "start_tui.bat" -Destination "$distDir/"
+          Copy-Item "README.md" -Destination "$distDir/"
+          Copy-Item "LICENSE" -Destination "$distDir/"
+          
+          Compress-Archive -Path "$distDir/*" -DestinationPath "target/$distName.zip" -Force
+          
+          $exeHash = (Get-FileHash "$distDir/multi-antigravity.exe" -Algorithm SHA256).Hash.ToLower()
+          $zipHash = (Get-FileHash "target/$distName.zip" -Algorithm SHA256).Hash.ToLower()
+          
+          $checksumContent = "$zipHash  $distName.zip`n$exeHash  multi-antigravity.exe"
+          Set-Content -Path "target/checksums-sha256.txt" -Value $checksumContent -Encoding ascii
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Multi-Antigravity ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          files: |
+            target/multi-antigravity-*-windows-x64.zip
+            target/dist/*/multi-antigravity.exe
+            target/checksums-sha256.txt
