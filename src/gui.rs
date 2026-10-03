@@ -407,9 +407,16 @@ fn show_cockpit_from_tray(ui_weak: &slint::Weak<MainWindow>) {
         move || {
             if let Some(ui) = ui_weak.upgrade() {
                 let c = conf.lock().unwrap();
-                let _ = c.open_sandbox_in_explorer();
-                ui.set_toast_message("已打开沙箱目录。".into());
-                append_log(&ui, "EXPLORER", "打开沙箱目录 data/instance_2");
+                match c.open_sandbox_in_explorer() {
+                    Ok(()) => {
+                        ui.set_toast_message("已打开沙箱目录。".into());
+                        append_log(&ui, "EXPLORER", "打开沙箱目录 data/instance_2");
+                    }
+                    Err(e) => {
+                        ui.set_toast_message(format!("打开沙箱失败: {}", e).into());
+                        append_log(&ui, "ERROR", &format!("打开沙箱目录失败: {}", e));
+                    }
+                }
             }
         }
     });

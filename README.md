@@ -70,15 +70,15 @@ copy target\release\multi-antigravity-rust.exe multi-antigravity.exe
 
 | 按键 | 功能 | 说明 | 适用 |
 | :---: | :--- | :--- | :---: |
-| **<kbd>Space</kbd>** | **启动 / 唤醒分身** | 未运行时启动分身；运行中时唤醒分身窗口置顶 | GUI / TUI |
-| **<kbd>K</kbd>** | **停止分身** | 终止分身进程树 | GUI / TUI |
+| **<kbd>Space</kbd>** | **启动 / 断开分身** | 未运行时启动分身；运行中时断开并退出分身（TUI 下为唤醒） | GUI / TUI |
+| **<kbd>K</kbd>** | **断开分身** | 终止分身进程树 | GUI / TUI |
 | **<kbd>R</kbd>** | **重启语言服务** | 终止分身语言服务进程，触发自动重启刷新端口 | GUI / TUI |
-| **<kbd>C</kbd>** | **清除独立凭据** | 删除独立 Token 文件，下次打开时可重新登录账号 | GUI / TUI |
-| **<kbd>P</kbd>** | **免 TUN 代理管理** | 一键为桌面版与 IDE 版部署/移除透明代理注入并探测 7890 端口 | GUI / TUI |
+| **<kbd>C</kbd>** | **清除独立凭据** | 弹出二次确认保护，确认后删除独立 Token | GUI / TUI |
+| **<kbd>P</kbd>** | **代理注入管理** | 部署/移除客户端 `version.dll` 代理注入并检测本地 7890 端口 | GUI / TUI |
 | **<kbd>O</kbd>** | **打开沙箱目录** | 打开 `data/instance_2` 目录 | GUI / TUI |
+| **<kbd>L</kbd>** | **日志流切换 / 清屏** | GUI 循环切换日志管道，TUI 清空日志缓冲区 | GUI / TUI |
 | **<kbd>T</kbd>** | **中 / EN 切换** | 切换界面语言 | 仅 TUI |
-| **<kbd>L</kbd>** | **控制台清屏** | 清空日志缓冲区 | 仅 TUI |
-| **<kbd>Q</kbd>** | **退出座舱** | 退出座舱应用（窗口点击 `[✕]` 为最小化至托盘） | GUI / TUI |
+| **<kbd>Q</kbd>** | **退出** | 退出终端仪表盘（GUI 走系统标题栏关闭/托盘） | 仅 TUI |
 
 ---
 
