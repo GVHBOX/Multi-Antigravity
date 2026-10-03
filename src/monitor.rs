@@ -29,10 +29,10 @@ pub struct TelemetryMonitor {
     pub total_memory_mb: f64,
     cached_host_ls_pid: Option<u32>,
     cached_host_port: Option<u16>,
-    host_port_probed: bool,
+    host_port_retry_count: u32,
     cached_sub_ls_pid: Option<u32>,
     cached_sub_port: Option<u16>,
-    sub_port_probed: bool,
+    sub_port_retry_count: u32,
 }
 
 impl TelemetryMonitor {
@@ -46,10 +46,10 @@ impl TelemetryMonitor {
             total_memory_mb: 0.0,
             cached_host_ls_pid: None,
             cached_host_port: None,
-            host_port_probed: false,
+            host_port_retry_count: 0,
             cached_sub_ls_pid: None,
             cached_sub_port: None,
-            sub_port_probed: false,
+            sub_port_retry_count: 0,
         }
     }
 
@@ -113,17 +113,42 @@ impl TelemetryMonitor {
             }
         }
 
-        if host_ls_pid != self.cached_host_ls_pid || !self.host_port_probed {
+        if host_ls_pid != self.cached_host_ls_pid {
             self.cached_host_ls_pid = host_ls_pid;
-            self.host_port_probed = true;
-            self.cached_host_port = host_ls_pid.and_then(detect_listening_port);
+            self.cached_host_port = None;
+            self.host_port_retry_count = 0;
         }
 
-        if sub_ls_pid != self.cached_sub_ls_pid || !self.sub_port_probed {
-            self.cached_sub_ls_pid = sub_ls_pid;
-            self.sub_port_probed = true;
-            self.cached_sub_port = sub_ls_pid.and_then(detect_listening_port);
+        if let Some(pid) = host_ls_pid {
+            if self.cached_host_port.is_none() {
+                self.host_port_retry_count = self.host_port_retry_count.wrapping_add(1);
+                if self.host_port_retry_count <= 10 || self.host_port_retry_count % 5 == 0 {
+                    self.cached_host_port = detect_listening_port(pid);
+                }
+            }
+        } else {
+            self.cached_host_port = None;
+            self.host_port_retry_count = 0;
         }
+
+        if sub_ls_pid != self.cached_sub_ls_pid {
+            self.cached_sub_ls_pid = sub_ls_pid;
+            self.cached_sub_port = None;
+            self.sub_port_retry_count = 0;
+        }
+
+        if let Some(pid) = sub_ls_pid {
+            if self.cached_sub_port.is_none() {
+                self.sub_port_retry_count = self.sub_port_retry_count.wrapping_add(1);
+                if self.sub_port_retry_count <= 10 || self.sub_port_retry_count % 5 == 0 {
+                    self.cached_sub_port = detect_listening_port(pid);
+                }
+            }
+        } else {
+            self.cached_sub_port = None;
+            self.sub_port_retry_count = 0;
+        }
+
 
         self.host = ProcessStats {
             is_running: host_electron_pid.is_some(),

@@ -1,13 +1,30 @@
 use crate::launcher::LauncherConfig;
 use crate::monitor::TelemetryMonitor;
 use anyhow::Result;
-use slint::{CloseRequestResponse, ComponentHandle, Timer, TimerMode};
-use std::cell::RefCell;
-use std::collections::VecDeque;
-use std::rc::Rc;
+use slint::{CloseRequestResponse, ComponentHandle, ModelRc, Timer, TimerMode, VecModel};
 use std::sync::{Arc, Mutex};
 
 slint::include_modules!();
+
+fn update_ui_log_lines(ui: &MainWindow, st: &crate::streamer::LogStreamer) {
+    let parsed = st.get_parsed_lines();
+    ui.set_log_line_count(st.buffer.len() as i32);
+    let items: Vec<LogLineData> = parsed
+        .into_iter()
+        .map(|p| LogLineData {
+            line_no: p.line_no.into(),
+            time_str: p.time_str.into(),
+            level: p.level.into(),
+            level_color: slint::Color::from_rgb_u8(p.level_color_rgb.0, p.level_color_rgb.1, p.level_color_rgb.2),
+            tag: p.tag.into(),
+            tag_color: slint::Color::from_rgb_u8(p.tag_color_rgb.0, p.tag_color_rgb.1, p.tag_color_rgb.2),
+            text: p.text.into(),
+            text_color: slint::Color::from_rgb_u8(p.text_color_rgb.0, p.text_color_rgb.1, p.text_color_rgb.2),
+        })
+        .collect();
+    let model: ModelRc<LogLineData> = std::rc::Rc::new(VecModel::from(items)).into();
+    ui.set_log_lines(model);
+}
 
 pub fn run_gui(activation_event: crate::ActivationEvent) -> Result<()> {
     let config = Arc::new(Mutex::new(LauncherConfig::new()?));
@@ -214,20 +231,71 @@ fn show_cockpit_from_tray(ui_weak: &slint::Weak<MainWindow>) {
         }
     });
 
-    let log_buffer: Rc<RefCell<VecDeque<String>>> =
-        Rc::new(RefCell::new(VecDeque::with_capacity(250)));
+    let streamer = Arc::new(Mutex::new(crate::streamer::LogStreamer::new()));
+    {
+        let st = streamer.lock().unwrap();
+        main_window.set_current_stream_idx(st.get_source_index());
+        main_window.set_stream_source_name(st.current_source.display_name().into());
+        update_ui_log_lines(&main_window, &st);
+    }
+    main_window.set_token_present(config.lock().unwrap().is_token_present());
+
+
     let append_log = {
-        let log_buffer = Rc::clone(&log_buffer);
+        let streamer = Arc::clone(&streamer);
         move |ui: &MainWindow, tag: &str, msg: &str| {
-            let time = chrono::Local::now().format("%H:%M:%S").to_string();
-            let mut buffer = log_buffer.borrow_mut();
-            if buffer.len() >= 250 {
-                buffer.pop_front();
+            let mut st = streamer.lock().unwrap();
+            st.add_system_log(tag, msg);
+            if st.current_source == crate::streamer::StreamSource::CockpitSystem {
+                update_ui_log_lines(ui, &st);
             }
-            buffer.push_back(format!("[{}] [{}] {}\n", time, tag, msg));
-            ui.set_log_content(buffer.iter().cloned().collect::<String>().into());
         }
     };
+
+    main_window.on_cycle_stream_source({
+        let ui_weak = main_window.as_weak();
+        let streamer = Arc::clone(&streamer);
+        move || {
+            if let Some(ui) = ui_weak.upgrade() {
+                let mut st = streamer.lock().unwrap();
+                let next = st.cycle_source();
+                let idx = st.get_source_index();
+                ui.set_current_stream_idx(idx);
+                ui.set_stream_source_name(next.display_name().into());
+                update_ui_log_lines(&ui, &st);
+                ui.set_toast_message(format!("日志管道已切换为: {}", next.display_name()).into());
+            }
+        }
+    });
+
+    main_window.on_select_stream_source({
+        let ui_weak = main_window.as_weak();
+        let streamer = Arc::clone(&streamer);
+        move |idx| {
+            if let Some(ui) = ui_weak.upgrade() {
+                let mut st = streamer.lock().unwrap();
+                let source = crate::streamer::LogStreamer::from_source_index(idx);
+                st.set_source(source);
+                ui.set_current_stream_idx(idx);
+                ui.set_stream_source_name(source.display_name().into());
+                update_ui_log_lines(&ui, &st);
+                ui.set_toast_message(format!("已切换至: {}", source.display_name()).into());
+            }
+        }
+    });
+
+    main_window.on_action_clear_log({
+        let ui_weak = main_window.as_weak();
+        let streamer = Arc::clone(&streamer);
+        move || {
+            if let Some(ui) = ui_weak.upgrade() {
+                let mut st = streamer.lock().unwrap();
+                st.clear_current();
+                update_ui_log_lines(&ui, &st);
+                ui.set_toast_message("当前日志管道已清空".into());
+            }
+        }
+    });
 
     main_window.on_action_space({
         let ui_weak = main_window.as_weak();
@@ -346,9 +414,59 @@ fn show_cockpit_from_tray(ui_weak: &slint::Weak<MainWindow>) {
         }
     });
 
+    main_window.on_action_proxy({
+        let ui_weak = main_window.as_weak();
+        let append_log = append_log.clone();
+        move || {
+            if let Some(ui) = ui_weak.upgrade() {
+                let status = crate::proxy::ProxyManager::check_status();
+                if status.is_any_deployed() {
+                    match crate::proxy::ProxyManager::remove_all() {
+                        Ok(msg) => {
+                            ui.set_toast_message("已移除免 TUN 代理".into());
+                            append_log(&ui, "PROXY", &msg);
+                        }
+                        Err(e) => {
+                            let err = format!("移除失败: {}", e);
+                            ui.set_toast_message(err.clone().into());
+                            append_log(&ui, "ERROR", &err);
+                        }
+                    }
+                } else {
+                    match crate::proxy::ProxyManager::deploy_all() {
+                        Ok(msg) => {
+                            ui.set_toast_message("免 TUN 代理已部署就绪".into());
+                            append_log(&ui, "PROXY", &msg);
+                            if !status.port_online {
+                                append_log(&ui, "WARN", "本地 7890 端口未监听。");
+                            }
+                        }
+                        Err(e) => {
+                            let err = format!("部署失败: {}", e);
+                            ui.set_toast_message(err.clone().into());
+                            append_log(&ui, "ERROR", &err);
+                        }
+                    }
+                }
+            }
+        }
+    });
+
     main_window.on_action_quit({
         move || {
             std::process::exit(0);
+        }
+    });
+
+    let log_timer = Timer::default();
+    let ui_weak_log = main_window.as_weak();
+    let streamer_poll = Arc::clone(&streamer);
+    log_timer.start(TimerMode::Repeated, std::time::Duration::from_millis(500), move || {
+        if let Some(ui) = ui_weak_log.upgrade() {
+            let mut st = streamer_poll.lock().unwrap();
+            if st.poll_updates() {
+                update_ui_log_lines(&ui, &st);
+            }
         }
     });
 
@@ -357,6 +475,7 @@ fn show_cockpit_from_tray(ui_weak: &slint::Weak<MainWindow>) {
     let ui_weak_activate = main_window.as_weak();
     let monitor_timer = Arc::clone(&monitor);
     let sub_pid_mon = Arc::clone(&sub_pid);
+    let config_timer = Arc::clone(&config);
 
     let mut self_sys = sysinfo::System::new();
     #[cfg(windows)]
@@ -408,9 +527,12 @@ fn show_cockpit_from_tray(ui_weak: &slint::Weak<MainWindow>) {
             let mut mon = monitor_timer.lock().unwrap();
             let known_sub = *sub_pid_mon.lock().unwrap();
             mon.refresh(known_sub);
-            if !mon.sub.is_running {
+            if let Some(pid) = mon.sub.electron_pid {
+                *sub_pid_mon.lock().unwrap() = Some(pid);
+            } else if !mon.sub.is_running {
                 *sub_pid_mon.lock().unwrap() = None;
             }
+
 
             ui.set_host_running(mon.host.is_running);
             ui.set_host_cpu(mon.host.cpu_usage);
@@ -445,6 +567,31 @@ fn show_cockpit_from_tray(ui_weak: &slint::Weak<MainWindow>) {
                     format!("开销: {:.1} MB", proc.memory() as f64 / (1024.0 * 1024.0)).into(),
                 );
             }
+            ui.set_token_present(config_timer.lock().unwrap().is_token_present());
+
+
+            let p_status = crate::proxy::ProxyManager::check_status();
+            if p_status.is_fully_deployed() {
+                if p_status.port_online {
+                    ui.set_proxy_status("免TUN代理就绪 (7890)".into());
+                    ui.set_proxy_color(slint::Color::from_rgb_u8(16, 185, 129));
+                } else {
+                    ui.set_proxy_status("代理已就绪(端口未开)".into());
+                    ui.set_proxy_color(slint::Color::from_rgb_u8(245, 158, 11));
+                }
+                ui.set_proxy_btn_text("移除免TUN代理".into());
+                ui.set_proxy_btn_color(slint::Color::from_rgb_u8(244, 63, 94));
+            } else if p_status.is_any_deployed() {
+                ui.set_proxy_status("代理部分就绪".into());
+                ui.set_proxy_color(slint::Color::from_rgb_u8(245, 158, 11));
+                ui.set_proxy_btn_text("重新部署代理".into());
+                ui.set_proxy_btn_color(slint::Color::from_rgb_u8(251, 191, 36));
+            } else {
+                ui.set_proxy_status("未部署免TUN代理".into());
+                ui.set_proxy_color(slint::Color::from_rgb_u8(100, 116, 139));
+                ui.set_proxy_btn_text("部署免TUN代理".into());
+                ui.set_proxy_btn_color(slint::Color::from_rgb_u8(16, 185, 129));
+            }
         }
     });
 
@@ -473,6 +620,21 @@ fn show_cockpit_from_tray(ui_weak: &slint::Weak<MainWindow>) {
         append_log(&main_window, "SYSTEM", "座舱就绪");
         append_log(&main_window, "SANDBOX", &format!("沙箱根目录: {sandbox_path}"));
         append_log(&main_window, "MONITOR", &host_line);
+
+        let initial_proxy = crate::proxy::ProxyManager::check_status();
+        if initial_proxy.is_fully_deployed() {
+            main_window.set_proxy_status(if initial_proxy.port_online { "免TUN代理就绪 (7890)".into() } else { "代理已就绪(端口未开)".into() });
+            main_window.set_proxy_color(if initial_proxy.port_online { slint::Color::from_rgb_u8(16, 185, 129) } else { slint::Color::from_rgb_u8(245, 158, 11) });
+            main_window.set_proxy_btn_text("移除免TUN代理".into());
+            main_window.set_proxy_btn_color(slint::Color::from_rgb_u8(244, 63, 94));
+            append_log(&main_window, "PROXY", &format!("免 TUN 代理已就绪 (本地 7890 端口: {})", if initial_proxy.port_online { "在线" } else { "未检测到监听" }));
+        } else {
+            main_window.set_proxy_status("未部署免TUN代理".into());
+            main_window.set_proxy_color(slint::Color::from_rgb_u8(100, 116, 139));
+            main_window.set_proxy_btn_text("部署免TUN代理".into());
+            main_window.set_proxy_btn_color(slint::Color::from_rgb_u8(16, 185, 129));
+            append_log(&main_window, "PROXY", "免 TUN 代理: 未部署");
+        }
     }
 
     main_window.show()?;

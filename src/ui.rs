@@ -459,6 +459,7 @@ fn render_dock(frame: &mut Frame, area: Rect, app: &App) {
         ("K", s.btn_kill, COLOR_ROSE),
         ("R", s.btn_restart, COLOR_AMBER),
         ("C", s.btn_clear, COLOR_PURPLE),
+        ("P", "代理", COLOR_EMERALD),
         ("O", s.btn_open, COLOR_SLATE_MUTED),
         ("T", s.btn_lang, COLOR_INDIGO),
         ("Q", s.btn_quit, COLOR_SLATE_DIM),

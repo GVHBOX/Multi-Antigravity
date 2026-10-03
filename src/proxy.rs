@@ -10,15 +10,14 @@ pub const CONFIG_JSON: &str = include_str!("../assets/proxy/config.json");
 pub const DEFAULT_PROXY_PORT: u16 = 7890;
 
 #[derive(Debug, Clone, Default)]
-#[allow(dead_code)]
 pub struct ProxyStatus {
     pub app_installed: bool,
     pub app_deployed: bool,
     pub ide_installed: bool,
     pub ide_deployed: bool,
     pub port_online: bool,
-    pub port: u16,
 }
+
 
 impl ProxyStatus {
     pub fn is_any_deployed(&self) -> bool {
@@ -30,22 +29,8 @@ impl ProxyStatus {
         let ide_ok = !self.ide_installed || self.ide_deployed;
         app_ok && ide_ok && (self.app_deployed || self.ide_deployed)
     }
-
-    #[allow(dead_code)]
-    pub fn summary_text(&self) -> &'static str {
-        if self.is_fully_deployed() {
-            if self.port_online {
-                "代理就绪 (SOCKS5 7890)"
-            } else {
-                "代理已部署 (7890未开启)"
-            }
-        } else if self.is_any_deployed() {
-            "部分部署"
-        } else {
-            "未部署代理"
-        }
-    }
 }
+
 
 pub struct ProxyManager;
 
@@ -98,22 +83,43 @@ impl ProxyManager {
             ide_installed,
             ide_deployed,
             port_online,
-            port: DEFAULT_PROXY_PORT,
         }
+
+    }
+
+    fn deploy_to_dir(dir: &std::path::Path) -> Result<()> {
+        let dll_path = dir.join("version.dll");
+        let bak_path = dir.join("version.dll.bak");
+        if dll_path.exists() && !bak_path.exists() {
+            let _ = fs::copy(&dll_path, &bak_path);
+        }
+        fs::write(&dll_path, VERSION_DLL)?;
+        fs::write(dir.join("config.json"), CONFIG_JSON)?;
+        Ok(())
+    }
+
+    fn remove_from_dir(dir: &std::path::Path) -> bool {
+        let dll_path = dir.join("version.dll");
+        let bak_path = dir.join("version.dll.bak");
+        if bak_path.exists() {
+            let _ = fs::rename(&bak_path, &dll_path);
+        } else {
+            let _ = fs::remove_file(&dll_path);
+        }
+        let _ = fs::remove_file(dir.join("config.json"));
+        !dll_path.exists() || bak_path.exists()
     }
 
     pub fn deploy_all() -> Result<String> {
         let mut deployed = Vec::new();
 
         if let Some(dir) = Self::app_dir() {
-            fs::write(dir.join("version.dll"), VERSION_DLL)?;
-            fs::write(dir.join("config.json"), CONFIG_JSON)?;
+            Self::deploy_to_dir(&dir)?;
             deployed.push("桌面版");
         }
 
         if let Some(dir) = Self::ide_dir() {
-            fs::write(dir.join("version.dll"), VERSION_DLL)?;
-            fs::write(dir.join("config.json"), CONFIG_JSON)?;
+            Self::deploy_to_dir(&dir)?;
             deployed.push("IDE版");
         }
 
@@ -121,24 +127,25 @@ impl ProxyManager {
             anyhow::bail!("未找到 Antigravity 或 Antigravity IDE 安装目录！");
         }
 
-        Ok(format!("代理已成功部署至: {}", deployed.join(" & ")))
+        Ok(format!("代理已部署至: {}", deployed.join(" & ")))
     }
 
     pub fn remove_all() -> Result<String> {
         let mut removed = Vec::new();
 
         if let Some(dir) = Self::app_dir() {
-            let _ = fs::remove_file(dir.join("version.dll"));
-            let _ = fs::remove_file(dir.join("config.json"));
-            removed.push("桌面版");
+            if Self::remove_from_dir(&dir) {
+                removed.push("桌面版");
+            }
         }
 
         if let Some(dir) = Self::ide_dir() {
-            let _ = fs::remove_file(dir.join("version.dll"));
-            let _ = fs::remove_file(dir.join("config.json"));
-            removed.push("IDE版");
+            if Self::remove_from_dir(&dir) {
+                removed.push("IDE版");
+            }
         }
 
         Ok(format!("已从 {} 移除代理注入文件", removed.join(" & ")))
     }
 }
+

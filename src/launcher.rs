@@ -17,7 +17,7 @@ pub struct LauncherConfig {
 
 impl LauncherConfig {
     pub fn new() -> Result<Self> {
-        let base_dir = env::current_dir().context("Failed to get current directory")?;
+        let base_dir = Self::resolve_base_dir()?;
         let sandbox_root = base_dir.join("data").join("instance_2");
         let home_dir = sandbox_root.join("home");
         let roaming_dir = sandbox_root.join("AppData").join("Roaming");
@@ -36,6 +36,28 @@ impl LauncherConfig {
             roaming_dir,
             token_path,
         })
+    }
+
+    fn resolve_base_dir() -> Result<PathBuf> {
+        if let Ok(exe_path) = env::current_exe() {
+            if let Some(exe_dir) = exe_path.parent() {
+                if exe_dir.join("data").exists() || exe_dir.join("multi-antigravity.exe").exists() {
+                    return Ok(exe_dir.to_path_buf());
+                }
+                if let Some(parent) = exe_dir.parent() {
+                    if parent.join("data").exists() {
+                        return Ok(parent.to_path_buf());
+                    }
+                    if let Some(grandparent) = parent.parent() {
+                        if grandparent.join("data").exists() {
+                            return Ok(grandparent.to_path_buf());
+                        }
+                    }
+                }
+                return Ok(exe_dir.to_path_buf());
+            }
+        }
+        env::current_dir().context("Failed to get current directory")
     }
 
     pub fn ensure_sandbox_dirs(&self) -> Result<()> {
@@ -105,11 +127,33 @@ impl LauncherConfig {
     }
 
     pub fn kill_sub_instance_by_pid(&self, pid: u32) -> Result<()> {
-        let _ = Command::new("taskkill")
+
+        let output = Command::new("taskkill")
             .args(["/PID", &pid.to_string(), "/T", "/F"])
             .creation_flags(WIN32_DETACHED_FLAGS)
-            .output();
-        Ok(())
+            .output()
+            .with_context(|| format!("Failed to execute taskkill for PID {}", pid))?;
+
+        if output.status.success() {
+            return Ok(());
+        }
+
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let combined = format!("{} {}", stderr, stdout);
+
+        if combined.contains("not found")
+            || combined.contains("找不到")
+            || combined.contains("没有找到")
+        {
+            return Ok(());
+        }
+
+        anyhow::bail!(
+            "终止进程失败 (PID: {}): {}",
+            pid,
+            stderr.trim()
+        )
     }
 
     pub fn bring_to_front(&self, target_pid: u32) -> bool {

@@ -237,6 +237,39 @@ impl App {
         }
     }
 
+    pub fn toggle_or_deploy_proxy(&mut self) {
+        let status = crate::proxy::ProxyManager::check_status();
+        if status.is_any_deployed() {
+            match crate::proxy::ProxyManager::remove_all() {
+                Ok(msg) => {
+                    self.add_log("PROXY", &msg);
+                    self.set_toast(msg, false);
+                }
+                Err(e) => {
+                    let err_msg = format!("移除代理失败: {}", e);
+                    self.add_log("PROXY", &err_msg);
+                    self.set_toast(err_msg, true);
+                }
+            }
+        } else {
+            match crate::proxy::ProxyManager::deploy_all() {
+                Ok(msg) => {
+                    self.add_log("PROXY", &msg);
+                    self.set_toast(msg, false);
+                    if !status.port_online {
+                        self.add_log("WARN", "本地 7890 端口未监听。");
+                    }
+
+                }
+                Err(e) => {
+                    let err_msg = format!("部署代理失败: {}", e);
+                    self.add_log("PROXY", &err_msg);
+                    self.set_toast(err_msg, true);
+                }
+            }
+        }
+    }
+
     fn init_logs(&mut self) {
         if self.language == Language::Zh {
             self.add_log("SYSTEM", "座舱就绪。");

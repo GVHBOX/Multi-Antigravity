@@ -228,4 +228,10 @@ if __name__ == "__main__":
 
     if "--selfcheck" in sys.argv:
         sys.exit(selfcheck())
-    print(json.dumps(scan(), ensure_ascii=False, indent=1))
+    res = scan()
+    print(json.dumps(res, ensure_ascii=False, indent=1))
+    if res.get("rs_comments") or res.get("slint_comments"):
+        sys.exit(1)
+    sys.exit(0)
+
+

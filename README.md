@@ -21,6 +21,12 @@
   - 通过 `CREATE_BREAKAWAY_FROM_JOB` 与 `DETACHED_PROCESS` 派生子进程。
   - 关闭座舱不影响已运行的分身，随时退出、随时重连接管。
 
+- **免 TUN 代理与网络管理（内置注入与端口自检）**：
+  - 二进制内嵌 `version.dll` 与 `config.json`，无需额外文件即可一键部署/恢复透明代理。
+  - 支持对 **Antigravity 桌面版** 及 **Antigravity IDE 编辑器版** 双向注入与状态检测。
+  - 自动探测本地 7890 代理端口连通性，彻底杜绝打国服游戏时的 TUN 模式延迟与 UDP 污染。
+  - 快捷键 `<kbd>P</kbd>` 随时在座舱中一键部署、热切换或移除代理。
+
 - **多账号环境隔离**：
   - `USERPROFILE` 与 `HOME` 重定向至 `data/instance_2/home`，避免配置文件冲突。
   - `APPDATA` 重定向至 `data/instance_2/AppData/Roaming`，独立扩展与缓存。
@@ -68,6 +74,7 @@ copy target\release\multi-antigravity-rust.exe multi-antigravity.exe
 | **<kbd>K</kbd>** | **停止分身** | 终止分身进程树 | GUI / TUI |
 | **<kbd>R</kbd>** | **重启语言服务** | 终止分身语言服务进程，触发自动重启刷新端口 | GUI / TUI |
 | **<kbd>C</kbd>** | **清除独立凭据** | 删除独立 Token 文件，下次打开时可重新登录账号 | GUI / TUI |
+| **<kbd>P</kbd>** | **免 TUN 代理管理** | 一键为桌面版与 IDE 版部署/移除透明代理注入并探测 7890 端口 | GUI / TUI |
 | **<kbd>O</kbd>** | **打开沙箱目录** | 打开 `data/instance_2` 目录 | GUI / TUI |
 | **<kbd>T</kbd>** | **中 / EN 切换** | 切换界面语言 | 仅 TUI |
 | **<kbd>L</kbd>** | **控制台清屏** | 清空日志缓冲区 | 仅 TUI |
@@ -82,7 +89,8 @@ multi-antigravity-rust/
 ├── assets/                 # 静态资源（图标源图、.ico、托盘数据）
 │   ├── icon.ico            # Windows PE 资源图标
 │   ├── icon.png            # 高清图标母版
-│   └── icon_32.rgba        # 托盘像素矩阵
+│   ├── icon_32.rgba        # 托盘像素矩阵
+│   └── proxy/              # 免 TUN 注入配置与 DLL
 ├── docs/                   # 项目文档与视觉设计稿
 │   └── cockpit-ui-prototype.html # 1920×1080 满屏界面视觉原型
 ├── src/                    # Rust 核心源代码
@@ -92,7 +100,10 @@ multi-antigravity-rust/
 │   ├── launcher.rs         # 进程派生、凭据管理与环境隔离
 │   ├── main.rs             # 入口分流与单实例控制
 │   ├── monitor.rs          # 进程扫描、端口探测与遥测
+│   ├── proxy.rs            # 免 TUN 代理注入与状态管理
+│   ├── streamer.rs         # 统一日志流管道解析器
 │   └── ui.rs               # Ratatui TUI 渲染器
+
 ├── ui/                     # Slint 界面声明
 │   └── cockpit.slint       # 桌面端界面定义
 ├── multi-antigravity.exe    # 发布版可执行文件

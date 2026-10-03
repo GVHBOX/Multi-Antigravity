@@ -5,6 +5,8 @@ mod gui;
 mod i18n;
 mod launcher;
 mod monitor;
+mod proxy;
+mod streamer;
 mod ui;
 
 use anyhow::{anyhow, Result};
@@ -170,6 +172,9 @@ fn main() -> Result<()> {
                         }
                         KeyCode::Char('c') | KeyCode::Char('C') => {
                             app.clear_token();
+                        }
+                        KeyCode::Char('p') | KeyCode::Char('P') => {
+                            app.toggle_or_deploy_proxy();
                         }
                         KeyCode::Char('o') | KeyCode::Char('O') => {
                             app.open_sandbox_dir();

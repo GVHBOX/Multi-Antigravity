@@ -11,8 +11,9 @@ fn main() {
         res.set_icon("assets/icon.ico");
         res.set("FileDescription", "Antigravity 多实例管理器");
         res.set("ProductName", "Antigravity Multi-Instance Manager");
-        res.set("ProductVersion", env!("CARGO_PKG_VERSION"));
-        res.set("FileVersion", "1.0.0.0");
+        let file_version = format!("{}.0", env!("CARGO_PKG_VERSION"));
+        res.set("FileVersion", &file_version);
+
         if let Err(e) = res.compile() {
             eprintln!("Failed to compile windows resource: {}", e);
         }

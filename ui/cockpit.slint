@@ -92,14 +92,73 @@ component KpiCard inherits Rectangle {
     }
 }
 
+export struct LogLineData {
+    line_no: string,
+    time_str: string,
+    level: string,
+    level_color: color,
+    tag: string,
+    tag_color: color,
+    text: string,
+    text_color: color,
+}
+
+component LogTab inherits Rectangle {
+    in property <string> icon;
+    in property <string> title;
+    in property <bool> is_active: false;
+    callback clicked();
+
+    background: is_active ? #172033 : (ta.has_hover ? rgba(255, 255, 255, 0.05) : transparent);
+    border-radius: 4px;
+    height: 28px;
+
+    ta := TouchArea {
+        clicked => { root.clicked(); }
+        mouse-cursor: pointer;
+    }
+
+    HorizontalLayout {
+        padding-left: 9px;
+        padding-right: 9px;
+        spacing: 5px;
+        alignment: center;
+
+        Text {
+            text: root.icon;
+            font-size: 11px;
+            vertical-alignment: center;
+        }
+
+        Text {
+            text: root.title;
+            color: root.is_active ? #38bdf8 : (ta.has_hover ? #e2e8f0 : #64748b);
+            font-size: 12px;
+            font-weight: root.is_active ? 700 : 500;
+            vertical-alignment: center;
+        }
+    }
+
+    if is_active : Rectangle {
+        y: parent.height - 2px;
+        height: 2px;
+        width: parent.width;
+        background: #38bdf8;
+    }
+}
+
 component KeyButton inherits Rectangle {
     in property <string> key_label;
     in property <string> action_label;
     in property <color> accent_color: #38bdf8;
+    in property <bool> is_accented: false;
     callback clicked();
 
-    background: ta.pressed ? #1e293b : (ta.has_hover ? #172033 : #0e131f);
-    border-color: ta.has_hover ? accent_color : #1e293b;
+    background: ta.pressed ? (root.is_accented ? accent_color.mix(#000000, 60%) : #1e293b) : 
+                (ta.has_hover ? (root.is_accented ? accent_color.mix(#000000, 75%) : #172033) : 
+                (root.is_accented ? accent_color.mix(#0e131f, 85%) : #0e131f));
+    border-color: ta.has_hover ? accent_color : 
+                 (root.is_accented ? accent_color.mix(#1e293b, 40%) : #1e293b);
     border-width: 1px;
     border-radius: 6px;
     height: 40px;
@@ -115,8 +174,8 @@ component KeyButton inherits Rectangle {
         alignment: center;
 
         Rectangle {
-            background: #1e293b;
-            border-color: #334155;
+            background: root.is_accented ? accent_color.mix(#000000, 75%) : #1e293b;
+            border-color: root.is_accented ? accent_color.mix(#000000, 30%) : #334155;
             border-width: 1px;
             border-radius: 6px;
             height: 24px;
@@ -125,7 +184,7 @@ component KeyButton inherits Rectangle {
 
             Text {
                 text: root.key_label;
-                color: #cbd5e1;
+                color: root.is_accented ? accent_color : #cbd5e1;
                 font-size: 12px;
                 font-weight: 700;
                 horizontal-alignment: center;
@@ -135,9 +194,9 @@ component KeyButton inherits Rectangle {
 
         Text {
             text: root.action_label;
-            color: ta.has_hover ? #f8fafc : #cbd5e1;
+            color: root.is_accented ? (ta.has_hover ? #ffffff : accent_color) : (ta.has_hover ? #f8fafc : #cbd5e1);
             font-size: 13px;
-            font-weight: 500;
+            font-weight: root.is_accented ? 700 : 500;
             vertical-alignment: center;
         }
     }
@@ -174,14 +233,28 @@ export component MainWindow inherits Window {
 
     in property <string> total_ram: "342.6 MB";
     in property <string> toast_message: "座舱已就绪";
+    in property <bool> token_present: false;
 
-    in property <string> log_content: "";
+
+    in property <string> proxy_status: "未部署代理";
+    in property <color> proxy_color: #64748b;
+    in property <string> proxy_btn_text: "部署代理";
+    in property <color> proxy_btn_color: #34d399;
+
+    in property <string> stream_source_name: "核心流: 主机语言服务 (Host-LS)";
+    in property <[LogLineData]> log_lines: [];
+    in property <int> log_line_count: 0;
+    in property <int> current_stream_idx: 0;
 
     callback action_space();
     callback action_kill();
     callback action_restart();
     callback action_clear();
+    callback action_proxy();
     callback action_open();
+    callback cycle_stream_source();
+    callback select_stream_source(int);
+    callback action_clear_log();
     callback action_quit();
 
     forward-focus: focus_scope;
@@ -204,8 +277,14 @@ export component MainWindow inherits Window {
             } else if (event.text == "c" || event.text == "C") {
                 root.action_clear();
                 accept
+            } else if (event.text == "p" || event.text == "P") {
+                root.action_proxy();
+                accept
             } else if (event.text == "o" || event.text == "O") {
                 root.action_open();
+                accept
+            } else if (event.text == "l" || event.text == "L") {
+                root.cycle_stream_source();
                 accept
             } else if (event.text == "q" || event.text == "Q") {
                 root.action_quit();
@@ -323,6 +402,13 @@ export component MainWindow inherits Window {
                             height: 34px;
                         }
 
+                        StatusPill {
+                            text: root.proxy_status;
+                            pill_color: root.proxy_color;
+                            show_dot: true;
+                            height: 34px;
+                        }
+
                         Rectangle {
                             background: rgba(56, 189, 248, 0.08);
                             border-color: rgba(56, 189, 248, 0.22);
@@ -366,7 +452,7 @@ export component MainWindow inherits Window {
 
             KpiCard {
                 title: "分身进程";
-                sub_left: root.sub_running ? "在线" : "未运行";
+                sub_left: root.sub_running ? (root.sub_pid == "--" ? "在线" : "PID: " + root.sub_pid) : "未运行";
                 value: root.sub_running ? "进程在线" : "未运行";
                 sub_right: root.sub_running ? (root.sub_port == "--" ? "服务未就绪" : "服务: " + root.sub_port) : "服务未启动";
                 val_color: root.sub_running ? #38bdf8 : #64748b;
@@ -384,12 +470,13 @@ export component MainWindow inherits Window {
 
             KpiCard {
                 title: "凭据隔离";
-                sub_left: "沙箱路径";
-                value: "已隔离";
-                sub_right: "独立凭据";
-                val_color: #c084fc;
-                highlight_color: #c084fc;
+                sub_left: "沙箱环境";
+                value: root.token_present ? "已授权" : "待授权";
+                sub_right: root.token_present ? "第二账号已就绪" : "未检测到凭据";
+                val_color: root.token_present ? #c084fc : #fbbf24;
+                highlight_color: root.token_present ? #c084fc : #fbbf24;
             }
+
         }
 
         HorizontalLayout {
@@ -671,32 +758,235 @@ export component MainWindow inherits Window {
                 horizontal-stretch: 1;
 
                 VerticalLayout {
-                    padding: 18px;
-                    spacing: 12px;
+                    padding: 16px;
+                    spacing: 10px;
 
                     HorizontalLayout {
                         alignment: space-between;
-                        Text { text: "诊断日志"; color: #94a3b8; font-size: 14px; font-weight: 700; }
-                        Text { text: "跟随最新"; color: #38bdf8; font-size: 12px; }
+
+                        HorizontalLayout {
+                            spacing: 4px;
+                            alignment: start;
+
+                            LogTab {
+                                icon: "⚡";
+                                title: "主机服务";
+                                is_active: root.current_stream_idx == 0;
+                                clicked => { root.select_stream_source(0); }
+                            }
+                            LogTab {
+                                icon: "🛡️";
+                                title: "分身服务";
+                                is_active: root.current_stream_idx == 1;
+                                clicked => { root.select_stream_source(1); }
+                            }
+                            LogTab {
+                                icon: "🌐";
+                                title: "免TUN代理";
+                                is_active: root.current_stream_idx == 2;
+                                clicked => { root.select_stream_source(2); }
+                            }
+                            LogTab {
+                                icon: "⚙️";
+                                title: "座舱系统";
+                                is_active: root.current_stream_idx == 3;
+                                clicked => { root.select_stream_source(3); }
+                            }
+                            LogTab {
+                                icon: "📦";
+                                title: "主程序";
+                                is_active: root.current_stream_idx == 4;
+                                clicked => { root.select_stream_source(4); }
+                            }
+                        }
+
+                        HorizontalLayout {
+                            spacing: 8px;
+                            alignment: end;
+
+                            Rectangle {
+                                background: rgba(30, 41, 59, 0.6);
+                                border-color: #334155;
+                                border-width: 1px;
+                                border-radius: 4px;
+                                height: 26px;
+                                HorizontalLayout {
+                                    padding-left: 8px;
+                                    padding-right: 8px;
+                                    alignment: center;
+                                    Text {
+                                        text: root.log_line_count + " 行";
+                                        color: #94a3b8;
+                                        font-size: 11px;
+                                        font-family: "Cascadia Mono";
+                                        vertical-alignment: center;
+                                    }
+                                }
+                            }
+
+                            Rectangle {
+                                background: ta_clear.has_hover ? #1e293b : transparent;
+                                border-color: ta_clear.has_hover ? #475569 : #334155;
+                                border-width: 1px;
+                                border-radius: 4px;
+                                height: 26px;
+                                ta_clear := TouchArea {
+                                    clicked => { root.action_clear_log(); }
+                                    mouse-cursor: pointer;
+                                }
+                                HorizontalLayout {
+                                    padding-left: 8px;
+                                    padding-right: 8px;
+                                    spacing: 4px;
+                                    alignment: center;
+                                    Text {
+                                        text: "⟲";
+                                        color: ta_clear.has_hover ? #f8fafc : #94a3b8;
+                                        font-size: 12px;
+                                        vertical-alignment: center;
+                                    }
+                                    Text {
+                                        text: "清空";
+                                        color: ta_clear.has_hover ? #f8fafc : #94a3b8;
+                                        font-size: 11px;
+                                        vertical-alignment: center;
+                                    }
+                                }
+                            }
+
+                            StatusPill {
+                                text: root.stream_source_name;
+                                pill_color: #38bdf8;
+                                show_dot: true;
+                                height: 26px;
+                            }
+
+                        }
                     }
 
                     Rectangle {
-                        background: #07090e;
+                        background: #06080d;
                         border-color: #1e293b;
                         border-width: 1px;
                         border-radius: 8px;
                         vertical-stretch: 1;
                         clip: true;
 
-                        log_text := Text {
-                            x: 14px;
-                            width: parent.width - 28px;
+                        Rectangle {
+                            x: 0;
+                            y: 0;
+                            width: 44px;
+                            height: parent.height;
+                            background: #090c13;
+                            border-color: #141b28;
+                            border-width: 1px;
+                        }
+
+                        VerticalLayout {
+                            x: 0;
+                            width: parent.width;
                             y: min(0px, parent.height - self.height);
-                            text: root.log_content;
-                            color: #cbd5e1;
-                            font-size: 13px;
-                            font-family: "Cascadia Mono";
-                            wrap: word-wrap;
+                            spacing: 1px;
+                            padding-top: 6px;
+                            padding-bottom: 6px;
+
+                            if root.log_lines.length == 0 : Rectangle {
+                                height: 140px;
+                                HorizontalLayout {
+                                    alignment: center;
+                                    VerticalLayout {
+                                        alignment: center;
+                                        spacing: 8px;
+                                        Text {
+                                            text: "暂无活动数据流输出";
+                                            color: #475569;
+                                            font-size: 13px;
+                                            font-weight: 600;
+                                            horizontal-alignment: center;
+                                        }
+                                        Text {
+                                            text: "等待目标进程写入日志";
+                                            color: #334155;
+                                            font-size: 11px;
+                                            horizontal-alignment: center;
+                                        }
+                                    }
+                                }
+                            }
+
+                            for line in root.log_lines : Rectangle {
+                                height: 22px;
+                                background: ta_row.has_hover ? rgba(255, 255, 255, 0.04) : transparent;
+                                ta_row := TouchArea {}
+
+                                HorizontalLayout {
+                                    padding-left: 6px;
+                                    padding-right: 12px;
+                                    spacing: 8px;
+
+                                    Text {
+                                        width: 32px;
+                                        text: line.line_no;
+                                        color: #475569;
+                                        font-size: 11px;
+                                        font-family: "Cascadia Mono";
+                                        horizontal-alignment: right;
+                                        vertical-alignment: center;
+                                    }
+
+                                    Text {
+                                        width: 60px;
+                                        text: line.time_str;
+                                        color: #64748b;
+                                        font-size: 11px;
+                                        font-family: "Cascadia Mono";
+                                        vertical-alignment: center;
+                                    }
+
+                                    Rectangle {
+                                        background: line.level_color.transparentize(85%);
+                                        border-color: line.level_color.transparentize(60%);
+                                        border-width: 1px;
+                                        border-radius: 3px;
+                                        height: 16px;
+                                        y: (parent.height - 16px) / 2;
+
+                                        HorizontalLayout {
+                                            padding-left: 5px;
+                                            padding-right: 5px;
+                                            alignment: center;
+                                            Text {
+                                                text: line.level;
+                                                color: line.level_color;
+                                                font-size: 10px;
+                                                font-weight: 700;
+                                                font-family: "Cascadia Mono";
+                                                vertical-alignment: center;
+                                            }
+                                        }
+                                    }
+
+                                    if line.tag != "" : Text {
+                                        text: line.tag;
+                                        color: line.tag_color;
+                                        font-size: 11px;
+                                        font-weight: 600;
+                                        font-family: "Cascadia Mono";
+                                        vertical-alignment: center;
+                                    }
+
+                                    Text {
+                                        text: line.text;
+                                        color: line.text_color;
+                                        font-size: 12px;
+                                        font-family: "Cascadia Mono";
+                                        vertical-alignment: center;
+                                        overflow: elide;
+                                        horizontal-stretch: 1;
+                                    }
+
+                                }
+                            }
                         }
                     }
                 }
@@ -738,10 +1028,25 @@ export component MainWindow inherits Window {
                 }
 
                 KeyButton {
+                    key_label: "P";
+                    action_label: root.proxy_btn_text;
+                    accent_color: root.proxy_btn_color;
+                    is_accented: true;
+                    clicked => { root.action_proxy(); }
+                }
+
+                KeyButton {
                     key_label: "O";
                     action_label: "打开沙箱目录";
                     accent_color: #818cf8;
                     clicked => { root.action_open(); }
+                }
+
+                KeyButton {
+                    key_label: "L";
+                    action_label: "切换日志流";
+                    accent_color: #38bdf8;
+                    clicked => { root.cycle_stream_source(); }
                 }
 
                 Rectangle { horizontal-stretch: 1; }

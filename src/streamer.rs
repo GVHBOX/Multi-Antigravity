@@ -33,18 +33,8 @@ impl StreamSource {
             Self::MainApp => "主程序: 应用更新 (Main)",
         }
     }
-
-    #[allow(dead_code)]
-    pub fn badge_name(&self) -> &'static str {
-        match self {
-            Self::LanguageServer => "主机 LS",
-            Self::SubLanguageServer => "分身 LS",
-            Self::ProxyLog => "免TUN代理",
-            Self::CockpitSystem => "座舱系统",
-            Self::MainApp => "主程序",
-        }
-    }
 }
+
 
 #[derive(Debug, Clone)]
 pub struct ParsedLogLine {
@@ -384,8 +374,8 @@ impl LogStreamer {
 
         if (clean.starts_with('I') || clean.starts_with('W') || clean.starts_with('E'))
             && clean.len() > 20
-            && clean[1..5].chars().all(|c| c.is_ascii_digit())
-            && clean.chars().nth(5) == Some(' ')
+            && clean.get(1..5).map_or(false, |s| s.chars().all(|c| c.is_ascii_digit()))
+            && clean.as_bytes().get(5) == Some(&b' ')
         {
             let level_char = clean.chars().next().unwrap();
             let (level, level_color) = match level_char {
@@ -395,7 +385,7 @@ impl LogStreamer {
                 _ => ("LOG", (148, 163, 184)),
             };
 
-            let time_part = &clean[6..14];
+            let time_part = clean.get(6..14).unwrap_or("");
             let time_str = if time_part.contains(':') {
                 time_part.to_string()
             } else {
@@ -481,7 +471,7 @@ impl LogStreamer {
                     } else {
                         first_token
                     };
-                    let short_time = if time.len() >= 8 { &time[..8] } else { time };
+                    let short_time = time.get(..8).unwrap_or(time);
                     (short_time.to_string(), remainder)
                 } else {
                     ("--:--:--".to_string(), clean)
