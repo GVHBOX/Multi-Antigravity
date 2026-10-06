@@ -22,7 +22,7 @@
 
 ## 作用
 
-双击运行 `Multi-Antigravity.exe`启动
+双击 `Multi-Antigravity.exe`启动
 - **系统代理**：工具有让Google Antigravity支持系统代理，点击“注入”即可
 - **分身**：最多支持4个分身，开分身登录，账号数据保存在 `data/` 目录中，主账号和分身不冲突。
 
