@@ -48,7 +48,7 @@ impl LauncherConfig {
     fn resolve_base_dir() -> Result<PathBuf> {
         if let Ok(exe_path) = env::current_exe() {
             if let Some(exe_dir) = exe_path.parent() {
-                if exe_dir.join("data").exists() || exe_dir.join("multi-antigravity.exe").exists() {
+                if exe_dir.join("data").exists() || exe_dir.join("Multi-Antigravity.exe").exists() || exe_dir.join("multi-antigravity.exe").exists() {
                     return Ok(exe_dir.to_path_buf());
                 }
                 if let Some(parent) = exe_dir.parent() {
@@ -77,22 +77,56 @@ impl LauncherConfig {
         let _ = fs::create_dir_all(&sandbox_config);
 
         if let Ok(real_user) = env::var("USERPROFILE") {
-            let host_skills = PathBuf::from(&real_user).join(".gemini").join("config").join("skills");
-            let sub_skills = sandbox_config.join("skills");
-            if host_skills.exists() && !sub_skills.exists() {
-                let _ = Command::new("cmd")
-                    .args(["/c", "mklink", "/J", &sub_skills.to_string_lossy(), &host_skills.to_string_lossy()])
-                    .creation_flags(WIN32_DETACHED_FLAGS)
-                    .output();
+            let host_user = PathBuf::from(&real_user);
+
+            let host_locallow = host_user.join("AppData").join("LocalLow");
+            let sub_appdata = self.home_dir.join("AppData");
+            let sub_locallow = sub_appdata.join("LocalLow");
+            if host_locallow.exists() {
+                let is_junc = sub_locallow
+                    .symlink_metadata()
+                    .map(|m| {
+                        use std::os::windows::fs::MetadataExt;
+                        m.file_attributes() & 0x400 != 0
+                    })
+                    .unwrap_or(false);
+                if !is_junc {
+                    if sub_locallow.exists() {
+                        let _ = fs::remove_dir_all(&sub_locallow);
+                    }
+                    if !sub_locallow.exists() {
+                        let _ = fs::create_dir_all(&sub_appdata);
+                        let _ = Command::new("cmd")
+                            .args(["/c", "mklink", "/J", &sub_locallow.to_string_lossy(), &host_locallow.to_string_lossy()])
+                            .creation_flags(WIN32_DETACHED_FLAGS)
+                            .output();
+                    }
+                }
             }
 
-            let host_rules = PathBuf::from(&real_user).join(".gemini").join("config").join("rules");
-            let sub_rules = sandbox_config.join("rules");
-            if host_rules.exists() && !sub_rules.exists() {
-                let _ = Command::new("cmd")
-                    .args(["/c", "mklink", "/J", &sub_rules.to_string_lossy(), &host_rules.to_string_lossy()])
-                    .creation_flags(WIN32_DETACHED_FLAGS)
-                    .output();
+            let shared_dirs = ["skills", "rules", "plugins", "sidecars"];
+            for dir_name in shared_dirs {
+                let host_dir = host_user.join(".gemini").join("config").join(dir_name);
+                let sub_dir = sandbox_config.join(dir_name);
+                if host_dir.exists() && !sub_dir.exists() {
+                    let _ = Command::new("cmd")
+                        .args(["/c", "mklink", "/J", &sub_dir.to_string_lossy(), &host_dir.to_string_lossy()])
+                        .creation_flags(WIN32_DETACHED_FLAGS)
+                        .output();
+                }
+            }
+
+            let host_mcp = host_user.join(".gemini").join("config").join("mcp_config.json");
+            let sub_mcp = sandbox_config.join("mcp_config.json");
+            if host_mcp.exists() {
+                let should_copy = if sub_mcp.exists() {
+                    fs::metadata(&sub_mcp).map(|m| m.len() == 0).unwrap_or(false)
+                } else {
+                    true
+                };
+                if should_copy {
+                    let _ = fs::copy(&host_mcp, &sub_mcp);
+                }
             }
         }
 
@@ -188,18 +222,45 @@ impl LauncherConfig {
         )
     }
 
+    pub fn spawn_host_native() -> Result<u32> {
+        let local_app_data = env::var("LOCALAPPDATA").context("LOCALAPPDATA is not set")?;
+        let executable_path = PathBuf::from(local_app_data)
+            .join("Programs")
+            .join("antigravity")
+            .join("Antigravity.exe");
+
+        if !executable_path.exists() {
+            anyhow::bail!(
+                "Antigravity.exe not found at {:?}. Please verify installation.",
+                executable_path
+            );
+        }
+
+        let mut cmd = Command::new(&executable_path);
+        cmd.creation_flags(WIN32_DETACHED_FLAGS);
+
+        let child = cmd
+            .spawn()
+            .with_context(|| format!("Failed to spawn host {:?}", executable_path))?;
+
+        Ok(child.id())
+    }
+
     pub fn bring_to_front(&self, target_pid: u32) -> bool {
         #[cfg(windows)]
         unsafe {
-            use windows_sys::Win32::Foundation::{HWND, LPARAM};
+            use windows_sys::Win32::Foundation::{HWND, LPARAM, RECT};
+            use windows_sys::Win32::System::Threading::{AttachThreadInput, GetCurrentThreadId};
             use windows_sys::Win32::UI::WindowsAndMessaging::{
-                EnumWindows, GetWindowThreadProcessId, IsWindowVisible, SetForegroundWindow,
-                ShowWindow, SW_RESTORE,
+                BringWindowToTop, EnumWindows, GetForegroundWindow,
+                GetWindowRect, GetWindowTextLengthW, GetWindowThreadProcessId, IsIconic,
+                IsWindowVisible, SetForegroundWindow, ShowWindow, SW_RESTORE,
             };
 
             struct SearchState {
                 target_pid: u32,
-                found_hwnd: HWND,
+                best_hwnd: HWND,
+                found_main: bool,
             }
 
             unsafe extern "system" fn enum_windows_callback(hwnd: HWND, lparam: LPARAM) -> i32 {
@@ -208,9 +269,20 @@ impl LauncherConfig {
                     let mut process_id: u32 = 0;
                     GetWindowThreadProcessId(hwnd, &mut process_id);
 
-                    if process_id == state.target_pid && IsWindowVisible(hwnd) != 0 {
-                        state.found_hwnd = hwnd;
-                        return 0;
+                    if process_id == state.target_pid && (IsWindowVisible(hwnd) != 0 || IsIconic(hwnd) != 0) {
+                        let mut rect: RECT = std::mem::zeroed();
+                        GetWindowRect(hwnd, &mut rect);
+                        let w = rect.right - rect.left;
+                        let h = rect.bottom - rect.top;
+                        let title_len = GetWindowTextLengthW(hwnd);
+
+                        if w > 100 && h > 100 && title_len > 0 {
+                            state.best_hwnd = hwnd;
+                            state.found_main = true;
+                            return 0;
+                        } else if state.best_hwnd.is_null() {
+                            state.best_hwnd = hwnd;
+                        }
                     }
                     1
                 }
@@ -218,14 +290,32 @@ impl LauncherConfig {
 
             let mut state = SearchState {
                 target_pid,
-                found_hwnd: std::ptr::null_mut(),
+                best_hwnd: std::ptr::null_mut(),
+                found_main: false,
             };
 
             EnumWindows(Some(enum_windows_callback), &mut state as *mut _ as LPARAM);
 
-            if !state.found_hwnd.is_null() {
-                ShowWindow(state.found_hwnd, SW_RESTORE);
-                SetForegroundWindow(state.found_hwnd);
+            if !state.best_hwnd.is_null() {
+                let fg_hwnd = GetForegroundWindow();
+                let fg_thread = if !fg_hwnd.is_null() {
+                    GetWindowThreadProcessId(fg_hwnd, std::ptr::null_mut())
+                } else {
+                    0
+                };
+                let cur_thread = GetCurrentThreadId();
+
+                if fg_thread != 0 && fg_thread != cur_thread {
+                    AttachThreadInput(cur_thread, fg_thread, 1);
+                    ShowWindow(state.best_hwnd, SW_RESTORE);
+                    SetForegroundWindow(state.best_hwnd);
+                    BringWindowToTop(state.best_hwnd);
+                    AttachThreadInput(cur_thread, fg_thread, 0);
+                } else {
+                    ShowWindow(state.best_hwnd, SW_RESTORE);
+                    SetForegroundWindow(state.best_hwnd);
+                    BringWindowToTop(state.best_hwnd);
+                }
                 return true;
             }
         }

@@ -58,10 +58,37 @@ class BITMAPINFOHEADER(ctypes.Structure):
 
 
 def find_window(pid, min_width=200):
+    kernel32 = ctypes.WinDLL("kernel32")
     access = 0x0040 | 0x0001 | 0x0100
-    hDesk = user32.OpenInputDesktop(0, False, access) or user32.OpenDesktopW("default", 0, False, access)
-    if hDesk:
-        user32.SetThreadDesktop(hDesk)
+    desktops_to_try = []
+
+    cur_desk = user32.GetThreadDesktop(kernel32.GetCurrentThreadId())
+    if cur_desk:
+        desktops_to_try.append(cur_desk)
+
+    h_input = user32.OpenInputDesktop(0, False, access)
+    if h_input:
+        desktops_to_try.append(h_input)
+
+    h_def = user32.OpenDesktopW("default", 0, False, access)
+    if h_def:
+        desktops_to_try.append(h_def)
+
+    CB_DESK = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.LPCWSTR, wintypes.LPARAM)
+    CB_WINSTA = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.LPCWSTR, wintypes.LPARAM)
+
+    def cb_winsta(name, _):
+        hw = user32.OpenWindowStationW(name, False, 0x037f)
+        if hw:
+            def cb_desk(dname, _):
+                hd = user32.OpenDesktopW(dname, 0, False, access)
+                if hd:
+                    desktops_to_try.append(hd)
+                return True
+            user32.EnumDesktopsW(hw, CB_DESK(cb_desk), 0)
+        return True
+    user32.EnumWindowStationsW(CB_WINSTA(cb_winsta), 0)
+
     found = []
 
     @ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
@@ -76,10 +103,13 @@ def find_window(pid, min_width=200):
                 return False
         return True
 
-    if hDesk:
-        user32.EnumDesktopWindows(hDesk, cb, 0)
-    else:
-        user32.EnumWindows(cb, 0)
+    for d in desktops_to_try:
+        user32.SetThreadDesktop(d)
+        user32.EnumDesktopWindows(d, cb, 0)
+        if found:
+            return found[0]
+
+    user32.EnumWindows(cb, 0)
     return found[0] if found else None
 
 

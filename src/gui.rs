@@ -173,6 +173,7 @@ fn show_cockpit_from_tray(ui_weak: &slint::Weak<MainWindow>) {
                 if IsIconic(hwnd) != 0 {
                     ShowWindow(hwnd, SW_RESTORE);
                 }
+                windows_sys::Win32::Graphics::Gdi::InvalidateRect(hwnd, std::ptr::null(), 1);
                 SetForegroundWindow(hwnd);
             }
         }
@@ -462,7 +463,16 @@ pub fn run_gui(activation_event: crate::ActivationEvent) -> Result<()> {
                         append_log(&ui, "WIN32", &format!("唤醒主号窗口 (PID: {p})"));
                     }
                 } else {
-                    ui.set_toast_message("主号未在运行。".into());
+                    match LauncherConfig::spawn_host_native() {
+                        Ok(new_pid) => {
+                            ui.set_toast_message(format!("主号已启动 (PID: {new_pid})。").into());
+                            append_log(&ui, "LAUNCHER", &format!("启动主号实例 (PID: {new_pid})"));
+                        }
+                        Err(e) => {
+                            ui.set_toast_message(format!("启动主号失败: {e}").into());
+                            append_log(&ui, "ERROR", &format!("启动主号失败: {e}"));
+                        }
+                    }
                 }
             }
         }
@@ -601,11 +611,11 @@ pub fn run_gui(activation_event: crate::ActivationEvent) -> Result<()> {
                 if status.is_any_deployed() {
                     match crate::proxy::ProxyManager::remove_all() {
                         Ok(msg) => {
-                            ui.set_toast_message("已关闭系统代理注入。".into());
+                            ui.set_toast_message("已移除系统代理注入。".into());
                             append_log(&ui, "PROXY", &msg);
                         }
                         Err(e) => {
-                            let err = format!("关闭代理失败: {}", e);
+                            let err = format!("移除代理失败: {}", e);
                             ui.set_toast_message(err.clone().into());
                             append_log(&ui, "ERROR", &err);
                         }
@@ -613,7 +623,7 @@ pub fn run_gui(activation_event: crate::ActivationEvent) -> Result<()> {
                 } else {
                     match crate::proxy::ProxyManager::deploy_all() {
                         Ok(msg) => {
-                            ui.set_toast_message("已开启系统代理注入 (7890)。".into());
+                            ui.set_toast_message("已开启系统代理注入。".into());
                             append_log(&ui, "PROXY", &msg);
                             if !status.port_online {
                                 append_log(&ui, "WARN", "本地 7890 端口未监听");
@@ -683,6 +693,14 @@ pub fn run_gui(activation_event: crate::ActivationEvent) -> Result<()> {
                 was_iconic = is_iconic;
                 return;
             };
+            if ui.get_is_dark() {
+                apply_dark_window_attributes(hwnd);
+            } else {
+                apply_light_window_attributes(hwnd);
+            }
+            unsafe {
+                windows_sys::Win32::Graphics::Gdi::InvalidateRect(hwnd, std::ptr::null(), 1);
+            }
             let cur = ui.get_redraw_tick();
             ui.set_redraw_tick(if cur == 0 { 1 } else { 0 });
             ui.window().request_redraw();
@@ -716,6 +734,7 @@ pub fn run_gui(activation_event: crate::ActivationEvent) -> Result<()> {
             }
 
             ui.set_host_running(mon.host.is_running);
+            ui.set_host_pid(mon.host.electron_pid.map(|p| p.to_string()).unwrap_or_else(|| "--".to_string()).into());
             ui.set_host_cpu(mon.host.cpu_usage);
             ui.set_host_ram(mon.host.memory_rss_mb as f32);
             if let Some(port) = mon.host.ls_port {
@@ -763,23 +782,23 @@ pub fn run_gui(activation_event: crate::ActivationEvent) -> Result<()> {
             let p_status = crate::proxy::ProxyManager::check_status();
             if p_status.is_fully_deployed() {
                 if p_status.port_online {
-                    ui.set_proxy_status("已开启 (7890)".into());
+                    ui.set_proxy_status("已注入".into());
                     ui.set_proxy_color(slint::Color::from_rgb_u8(52, 211, 153));
                 } else {
-                    ui.set_proxy_status("已开启 (7890 离线)".into());
+                    ui.set_proxy_status("已注入 (离线)".into());
                     ui.set_proxy_color(slint::Color::from_rgb_u8(245, 158, 11));
                 }
                 ui.set_proxy_deployed(true);
-                ui.set_proxy_btn_text("关闭代理".into());
+                ui.set_proxy_btn_text("移除".into());
                 ui.set_proxy_btn_color(slint::Color::from_rgb_u8(251, 113, 133));
             } else if p_status.is_any_deployed() {
-                ui.set_proxy_status("部分开启".into());
+                ui.set_proxy_status("部分注入".into());
                 ui.set_proxy_color(slint::Color::from_rgb_u8(245, 158, 11));
                 ui.set_proxy_deployed(true);
-                ui.set_proxy_btn_text("关闭代理".into());
+                ui.set_proxy_btn_text("移除".into());
                 ui.set_proxy_btn_color(slint::Color::from_rgb_u8(251, 113, 133));
             } else {
-                ui.set_proxy_status("未开启".into());
+                ui.set_proxy_status("未注入".into());
                 ui.set_proxy_color(slint::Color::from_rgb_u8(100, 116, 139));
                 ui.set_proxy_deployed(false);
                 ui.set_proxy_btn_text("开启代理".into());
@@ -816,14 +835,14 @@ pub fn run_gui(activation_event: crate::ActivationEvent) -> Result<()> {
 
         let initial_proxy = crate::proxy::ProxyManager::check_status();
         if initial_proxy.is_fully_deployed() {
-            main_window.set_proxy_status(if initial_proxy.port_online { "已开启 (7890)".into() } else { "已开启 (7890 离线)".into() });
+            main_window.set_proxy_status(if initial_proxy.port_online { "已注入".into() } else { "已注入 (离线)".into() });
             main_window.set_proxy_color(if initial_proxy.port_online { slint::Color::from_rgb_u8(52, 211, 153) } else { slint::Color::from_rgb_u8(245, 158, 11) });
             main_window.set_proxy_deployed(true);
-            main_window.set_proxy_btn_text("关闭代理".into());
+            main_window.set_proxy_btn_text("移除".into());
             main_window.set_proxy_btn_color(slint::Color::from_rgb_u8(251, 113, 133));
-            append_log(&main_window, "PROXY", &format!("系统代理注入已开启 (本地 7890 端口: {})", if initial_proxy.port_online { "在线" } else { "未检测到监听" }));
+            append_log(&main_window, "PROXY", &format!("系统代理已注入 (本地 7890 端口: {})", if initial_proxy.port_online { "在线" } else { "未检测到监听" }));
         } else {
-            main_window.set_proxy_status("未开启".into());
+            main_window.set_proxy_status("未注入".into());
             main_window.set_proxy_color(slint::Color::from_rgb_u8(100, 116, 139));
             main_window.set_proxy_deployed(false);
             main_window.set_proxy_btn_text("开启代理".into());

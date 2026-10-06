@@ -1,4 +1,4 @@
-use sysinfo::{ProcessesToUpdate, System};
+use sysinfo::{ProcessRefreshKind, ProcessesToUpdate, System, UpdateKind};
 
 #[derive(Clone)]
 pub struct ProcessStats {
@@ -38,11 +38,34 @@ pub struct TelemetryMonitor {
     sub_port_retry_counts: [u32; 3],
 }
 
+fn is_descendant_of(sys: &System, mut current_pid: sysinfo::Pid, target_pid: u32) -> bool {
+    for _ in 0..6 {
+        if let Some(proc) = sys.process(current_pid) {
+            if let Some(parent) = proc.parent() {
+                if parent.as_u32() == target_pid {
+                    return true;
+                }
+                current_pid = parent;
+            } else {
+                break;
+            }
+        } else {
+            break;
+        }
+    }
+    false
+}
+
 impl TelemetryMonitor {
     pub fn new() -> Self {
         let mut sys = System::new();
         sys.refresh_memory();
-        sys.refresh_processes(ProcessesToUpdate::All, true);
+        let refresh_kind = ProcessRefreshKind::nothing()
+            .with_memory()
+            .with_cpu()
+            .with_cmd(UpdateKind::OnlyIfNotSet)
+            .with_exe(UpdateKind::OnlyIfNotSet);
+        sys.refresh_processes_specifics(ProcessesToUpdate::All, true, refresh_kind);
         let total_ram = (sys.total_memory() as f64) / (1024.0 * 1024.0);
         let system_total_ram_mb = if total_ram > 0.0 { total_ram } else { 32768.0 };
         Self {
@@ -67,19 +90,16 @@ impl TelemetryMonitor {
 
     pub fn refresh(&mut self, known_sub_pids: [Option<u32>; 3]) {
         self.sys.refresh_memory();
-        self.sys.refresh_processes(ProcessesToUpdate::All, true);
-
-        let mut host_electron_pid = None;
-        let mut host_ls_pid = None;
-        let mut host_cpu = 0.0;
-        let mut host_mem_bytes = 0u64;
-
-        let mut sub_electron_pids = [None, None, None];
-        let mut sub_ls_pids = [None, None, None];
-        let mut sub_cpus = [0.0f32, 0.0f32, 0.0f32];
-        let mut sub_mem_bytes = [0u64, 0u64, 0u64];
+        let refresh_kind = ProcessRefreshKind::nothing()
+            .with_memory()
+            .with_cpu()
+            .with_cmd(UpdateKind::OnlyIfNotSet)
+            .with_exe(UpdateKind::OnlyIfNotSet);
+        self.sys.refresh_processes_specifics(ProcessesToUpdate::All, true, refresh_kind);
 
         let self_pid = std::process::id();
+        let mut active_sub_pids = known_sub_pids;
+        let mut host_electron_pid = None;
 
         for (pid, proc) in self.sys.processes() {
             let pid_u32 = pid.as_u32();
@@ -87,8 +107,68 @@ impl TelemetryMonitor {
                 continue;
             }
             let name = proc.name().to_string_lossy().to_lowercase();
-            let is_antigravity = name.contains("antigravity") && !name.contains("multi") && !name.contains("cockpit");
-            let is_ls = name.contains("language_server") || name.contains("jetski");
+            let is_antigravity = (name == "antigravity.exe" || name == "antigravity") && !name.contains("ide") && !name.contains("multi") && !name.contains("cockpit");
+            if !is_antigravity {
+                continue;
+            }
+
+            let cmd_line = proc
+                .cmd()
+                .iter()
+                .map(|s| s.to_string_lossy())
+                .collect::<Vec<_>>()
+                .join(" ");
+
+            let is_main_electron = !cmd_line.contains("--type=");
+
+            let mut matched_slot = None;
+            for slot in 0..3 {
+                let tag = format!("instance_{}", slot + 2);
+                if cmd_line.contains(&tag) {
+                    matched_slot = Some(slot);
+                    break;
+                }
+            }
+
+            if let Some(slot) = matched_slot {
+                if is_main_electron || active_sub_pids[slot].is_none() {
+                    active_sub_pids[slot] = Some(pid_u32);
+                }
+            } else if is_main_electron && host_electron_pid.is_none() {
+                let has_any_sub_tag = (0..3).any(|s| cmd_line.contains(&format!("instance_{}", s + 2)));
+                if !has_any_sub_tag {
+                    host_electron_pid = Some(pid_u32);
+                }
+            }
+        }
+
+        for slot in 0..3 {
+            if active_sub_pids[slot].is_none() {
+                if let Some(kpid) = known_sub_pids[slot] {
+                    if self.sys.process(sysinfo::Pid::from_u32(kpid)).is_some() {
+                        active_sub_pids[slot] = Some(kpid);
+                    }
+                }
+            }
+        }
+
+        let mut sub_electron_pids = active_sub_pids;
+        let mut sub_ls_pids = [None, None, None];
+        let mut sub_cpus = [0.0f32, 0.0f32, 0.0f32];
+        let mut sub_mem_bytes = [0u64, 0u64, 0u64];
+
+        let mut host_ls_pid = None;
+        let mut host_cpu = 0.0f32;
+        let mut host_mem_bytes = 0u64;
+
+        for (pid, proc) in self.sys.processes() {
+            let pid_u32 = pid.as_u32();
+            if pid_u32 == self_pid {
+                continue;
+            }
+            let name = proc.name().to_string_lossy().to_lowercase();
+            let is_antigravity = (name == "antigravity.exe" || name == "antigravity") && !name.contains("ide") && !name.contains("multi") && !name.contains("cockpit");
+            let is_ls = (name == "language_server.exe" || name == "language_server" || name.contains("jetski")) && !name.contains("ide");
 
             if !is_antigravity && !is_ls {
                 continue;
@@ -104,33 +184,42 @@ impl TelemetryMonitor {
             let mut matched_slot = None;
             for slot in 0..3 {
                 let tag = format!("instance_{}", slot + 2);
-                if cmd_line.contains(&tag)
-                    || known_sub_pids[slot] == Some(pid_u32)
-                    || (proc.parent().map(|p| p.as_u32()) == known_sub_pids[slot] && known_sub_pids[slot].is_some())
-                {
+                let is_slot_tag = cmd_line.contains(&tag);
+                let is_slot_main = active_sub_pids[slot] == Some(pid_u32);
+                let is_slot_descendant = active_sub_pids[slot]
+                    .map(|main_pid| is_descendant_of(&self.sys, *pid, main_pid))
+                    .unwrap_or(false);
+
+                if is_slot_tag || is_slot_main || is_slot_descendant {
                     matched_slot = Some(slot);
                     break;
                 }
             }
 
-            let is_main_electron = is_antigravity && !cmd_line.contains("--type=");
-
             if let Some(slot) = matched_slot {
-                if is_main_electron || (is_antigravity && sub_electron_pids[slot].is_none()) {
-                    sub_electron_pids[slot] = Some(pid_u32);
-                } else if is_ls && sub_ls_pids[slot].is_none() {
+                if is_ls && sub_ls_pids[slot].is_none() {
                     sub_ls_pids[slot] = Some(pid_u32);
+                } else if is_antigravity && sub_electron_pids[slot].is_none() {
+                    sub_electron_pids[slot] = Some(pid_u32);
                 }
                 sub_cpus[slot] += proc.cpu_usage();
                 sub_mem_bytes[slot] += proc.memory();
             } else {
-                if is_main_electron || (is_antigravity && host_electron_pid.is_none()) {
-                    host_electron_pid = Some(pid_u32);
-                } else if is_ls && host_ls_pid.is_none() {
-                    host_ls_pid = Some(pid_u32);
+                let is_host_main = host_electron_pid == Some(pid_u32);
+                let is_host_descendant = host_electron_pid
+                    .map(|main_pid| is_descendant_of(&self.sys, *pid, main_pid))
+                    .unwrap_or(false);
+                let is_fallback_host_electron = is_antigravity && !cmd_line.contains("--type=") && host_electron_pid.is_none();
+
+                if is_host_main || is_host_descendant || is_fallback_host_electron || host_electron_pid.is_some() {
+                    if is_ls && host_ls_pid.is_none() {
+                        host_ls_pid = Some(pid_u32);
+                    } else if is_antigravity && host_electron_pid.is_none() {
+                        host_electron_pid = Some(pid_u32);
+                    }
+                    host_cpu += proc.cpu_usage();
+                    host_mem_bytes += proc.memory();
                 }
-                host_cpu += proc.cpu_usage();
-                host_mem_bytes += proc.memory();
             }
         }
 

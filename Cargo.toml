@@ -1,6 +1,6 @@
 [package]
 name = "multi-antigravity-rust"
-version = "1.0.0"
+version = "1.0.1"
 edition = "2024"
 description = "Antigravity 多实例管理器"
 exclude = ["data/**", "*.WebView2/**"]

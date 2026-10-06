@@ -53,7 +53,7 @@ python tools/scan_comment.py --selfcheck
 报告、备份、脚本、截图、临时中间物全进 `.scratch/`（整体不进版本库）。
 根目录只允许：源码（`src/`、`ui/`）、文档与设计稿（`docs/`）、资源（`assets/`）、仓库元文件
 （`README.md`、`AGENTS.md`、`Cargo.toml`、`Cargo.lock`、`build.rs`、`.gitignore`、
-`tools/`、`start.bat`、`start_tui.bat`）、`target/`、`data/`、`multi-antigravity.exe`
+`tools/`）、`target/`、`data/`、`Multi-Antigravity.exe`
 （发布产物，`*.exe` 已被 `.gitignore` 排除，是手工复制出来的，不是构建输出）。
 
 `assets/icon.png` 是 Slint 唯一引用的图片，**不能让 `.gitignore` 的 `*.png` 把它排除掉**
@@ -139,7 +139,7 @@ python tools/ui_probe.py kill <pid>
 ```
 
   `shot` 走 PrintWindow，比抓屏可靠；`key` 走 PostMessage，不会打扰前台程序。
-- **发布产物原位覆盖**：发布产物为根目录 `multi-antigravity.exe`（由 `target/release/multi-antigravity-rust.exe` 复制并重命名）。用户可将该 exe 固定至 Windows 10 开始菜单磁贴进行快速测试。若旧版正在运行导致覆盖被锁，必须依「热更新进程接管授权」直接终止旧版管理器进程并完成覆盖，严禁留在 `target/release/` 或生成副本，确保用户通过磁贴调起即为最新版。
+- **发布产物原位覆盖**：发布产物为根目录 `Multi-Antigravity.exe`（由 `target/release/multi-antigravity-rust.exe` 复制并重命名）。用户可将该 exe 固定至 Windows 10 开始菜单磁贴进行快速测试。若旧版正在运行导致覆盖被锁，必须依「热更新进程接管授权」直接终止旧版管理器进程并完成覆盖，严禁留在 `target/release/` 或生成副本，确保用户通过磁贴调起即为最新版。
 
 ## 环境事实
 
@@ -150,7 +150,7 @@ python tools/ui_probe.py kill <pid>
 - **默认渲染后端是软件光栅**：`main.rs` 里没设 `SLINT_BACKEND` 时强制 `winit-software`。
   界面文案别写「硬件加速 / GPU」，与事实不符。
 - **发布流程**：`cargo build --release` → 复制
-  `target\release\multi-antigravity-rust.exe` 到根目录改名 `multi-antigravity.exe`
+  `target\release\multi-antigravity-rust.exe` 到根目录改名 `Multi-Antigravity.exe`
   （README 里也写了这步）。exe 不进版本库。
 - **`target/` 5.2 GB 不动**：D 盘剩 450 GB，占 1.2%；清掉要换 2~5 分钟全量重编（增量只要 20 秒 / 57 秒）。
   真要省就只删 `target/debug`。

@@ -48,18 +48,16 @@ jobs:
           $distDir = "target/dist/$distName"
           New-Item -ItemType Directory -Path $distDir -Force | Out-Null
           
-          Copy-Item "target/release/multi-antigravity-rust.exe" -Destination "$distDir/multi-antigravity.exe"
-          Copy-Item "start.bat" -Destination "$distDir/"
-          Copy-Item "start_tui.bat" -Destination "$distDir/"
+          Copy-Item "target/release/multi-antigravity-rust.exe" -Destination "$distDir/Multi-Antigravity.exe"
           Copy-Item "README.md" -Destination "$distDir/"
           Copy-Item "LICENSE" -Destination "$distDir/"
           
           Compress-Archive -Path "$distDir/*" -DestinationPath "target/$distName.zip" -Force
           
-          $exeHash = (Get-FileHash "$distDir/multi-antigravity.exe" -Algorithm SHA256).Hash.ToLower()
+          $exeHash = (Get-FileHash "$distDir/Multi-Antigravity.exe" -Algorithm SHA256).Hash.ToLower()
           $zipHash = (Get-FileHash "target/$distName.zip" -Algorithm SHA256).Hash.ToLower()
           
-          $checksumContent = "$zipHash  $distName.zip`n$exeHash  multi-antigravity.exe"
+          $checksumContent = "$zipHash  $distName.zip`n$exeHash  Multi-Antigravity.exe"
           Set-Content -Path "target/checksums-sha256.txt" -Value $checksumContent -Encoding ascii
 
       - name: Create GitHub Release
@@ -71,5 +69,5 @@ jobs:
           generate_release_notes: true
           files: |
             target/multi-antigravity-*-windows-x64.zip
-            target/dist/*/multi-antigravity.exe
+            target/dist/*/Multi-Antigravity.exe
             target/checksums-sha256.txt
