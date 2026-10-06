@@ -16,7 +16,7 @@
 
 <br/>
 
-<img src="docs/preview.png" alt="Multi-Antigravity 界面预览" width="100%" />
+<img src="assets/preview.png" alt="Multi-Antigravity 界面预览" width="100%" />
 
 </div>
 

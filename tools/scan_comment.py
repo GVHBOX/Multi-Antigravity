@@ -25,7 +25,7 @@ if hasattr(sys.stderr, "reconfigure"):
 ROOT = Path(os.environ.get("SCAN_ROOT") or Path(__file__).resolve().parents[1])
 
 RS_GLOBS = ["src/**/*.rs", "tests/**/*.rs"]
-SLINT_GLOBS = ["ui/**/*.slint"]
+SLINT_GLOBS = ["src/**/*.slint"]
 
 RAW_PREFIX = re.compile(r'(b?r)(#*)(")')
 BYTE_STRING = re.compile(r'b"')

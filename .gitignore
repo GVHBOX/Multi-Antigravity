@@ -4,7 +4,7 @@
 *.pdb
 *.png
 !assets/icon.png
-!docs/preview.png
+!assets/preview.png
 *.WebView2/
 *.exe
 __pycache__/

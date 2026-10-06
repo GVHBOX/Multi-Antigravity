@@ -1,7 +1,7 @@
 """GUI 探针：起临时实例 → 读窗口尺寸 → 截窗口内容 → 发按键 → 收尾。
 
 只用于本地验证 Slint 界面，Windows only，纯 ctypes，无第三方依赖。
-改 `ui/cockpit.slint` 之后用它替代「起 exe 用眼睛看」：能拿到真实像素尺寸，
+改 `src/cockpit.slint` 之后用它替代「起 exe 用眼睛看」：能拿到真实像素尺寸，
 能在被其他窗口遮挡时照样截到窗口自身内容（PrintWindow）。
 
     python tools/ui_probe.py launch                 # 起临时实例并打印 PID
